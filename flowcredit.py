@@ -1,6 +1,5 @@
 """
-FlowCredit Digital - Prototipo
-Motor de decision crediticia con IA para emprendedores digitales.
+FlowCredit Digital - Prototipo con reconocimiento facial MediaPipe
 Proyecto SENA 2026.
 """
 
@@ -316,23 +315,26 @@ def obtener_codigo_recuperacion(uid):
         return None
 
 
-# ============ RECONOCIMIENTO FACIAL ============
+# ============ RECONOCIMIENTO FACIAL CON MEDIAPIPE ============
 
 def detectar_rostro(imagen_bytes):
-    """Detecta si hay un rostro en la imagen usando OpenCV."""
+    """Detector con MediaPipe: mucho mas preciso que OpenCV."""
     try:
-        import cv2
+        import mediapipe as mp
+        from PIL import ImageOps
 
-        img = Image.open(io.BytesIO(imagen_bytes)).convert("RGB")
+        img = Image.open(io.BytesIO(imagen_bytes))
+        img = ImageOps.exif_transpose(img)
+        img = img.convert("RGB")
         arr = np.array(img)
-        gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
 
-        clasificador = cv2.CascadeClassifier(
-            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        )
-        rostros = clasificador.detectMultiScale(gray, 1.1, 4)
-        return len(rostros) > 0, len(rostros)
-    except Exception:
+        mp_face = mp.solutions.face_detection
+        with mp_face.FaceDetection(model_selection=0, min_detection_confidence=0.4) as detector:
+            resultado = detector.process(arr)
+            if resultado.detections:
+                return True, len(resultado.detections)
+        return False, 0
+    except Exception as e:
         return False, 0
 
 
@@ -353,7 +355,6 @@ def subir_foto_verificacion(uid, imagen_bytes):
 
 
 def guardar_verificacion(uid, url_foto, estado):
-    """Guarda el resultado de la verificacion en profiles."""
     restaurar_sesion()
     try:
         supabase_client.table("profiles").update({
@@ -454,6 +455,7 @@ with st.sidebar:
         st.rerun()
 
 # ⬇️ CONTINUA EN LA PARTE 2 ⬇️
+
 # ============ DASHBOARD ============
 
 if menu == "📊 Dashboard":
@@ -547,18 +549,18 @@ elif menu == "🛡️ Verificacion":
 
         st.divider()
         st.subheader("🔐 Verificacion biometrica con reconocimiento facial")
-        st.info("Toma una foto de tu rostro. El sistema verificara que sea una persona real y guardara la evidencia.")
+        st.info("Toma una foto de tu rostro de frente, con buena luz. El sistema detectara tu rostro y guardara la evidencia.")
 
         foto = st.camera_input("📸 Toma una foto de tu rostro")
 
         if foto is not None:
             imagen_bytes = foto.getvalue()
 
-            with st.spinner("Analizando rostro..."):
+            with st.spinner("Analizando rostro con MediaPipe..."):
                 tiene_rostro, cantidad = detectar_rostro(imagen_bytes)
 
             if not tiene_rostro:
-                st.error("❌ No se reconoce un rostro en la imagen. Asegurate de estar frente a la camara, con buena luz y sin obstaculos.")
+                st.error("❌ No se reconoce un rostro en la imagen. Intenta con mejor luz y rostro de frente.")
             else:
                 st.success("✅ Rostro detectado (" + str(cantidad) + " rostro(s))")
 
@@ -579,7 +581,7 @@ elif menu == "🛡️ Verificacion":
         codigo_info = obtener_codigo_recuperacion(uid)
 
         if codigo_info and codigo_info.get("recovery_code"):
-            st.warning("⚠️ Guarda este codigo en un lugar seguro. Es la unica forma de recuperar tu cuenta.")
+            st.warning("⚠️ Guarda este codigo en un lugar seguro.")
             st.code(codigo_info["recovery_code"], language=None)
         else:
             st.info("Aun no has generado tu codigo de recuperacion.")
@@ -603,7 +605,7 @@ elif menu == "💳 Solicitar credito":
     if cliente:
         st.success("✅ Cliente verificado: " + cliente["nombre_completo"] + " | Cedula " + cliente["cedula"] + " | Score " + str(cliente["score_datacredito"]))
     else:
-        st.warning("⚠️ No tienes verificacion previa. Ve a la seccion Verificacion.")
+        st.warning("⚠️ No tienes verificacion previa.")
 
     if st.session_state["resultado_actual"] is None:
         ingresos_default = int(cliente["ingresos_declarados"]) if cliente else 3000000
