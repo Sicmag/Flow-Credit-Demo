@@ -4,3 +4,4 @@ supabase
 supabase-auth
 pandas
 plotly
+pyarrow==14.0.2
