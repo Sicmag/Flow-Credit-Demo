@@ -318,9 +318,9 @@ def obtener_codigo_recuperacion(uid):
 # ============ RECONOCIMIENTO FACIAL CON MEDIAPIPE ============
 
 def detectar_rostro(imagen_bytes):
-    """Detector con diagnostico de errores visible."""
+    """Deteccion facial con OpenCV headless (estable en Streamlit Cloud)."""
     try:
-        import mediapipe as mp
+        import cv2
         from PIL import ImageOps
 
         img = Image.open(io.BytesIO(imagen_bytes))
@@ -328,45 +328,30 @@ def detectar_rostro(imagen_bytes):
         img = img.convert("RGB")
         arr = np.array(img)
 
-        mp_face = mp.solutions.face_detection
-        with mp_face.FaceDetection(model_selection=0, min_detection_confidence=0.4) as detector:
-            resultado = detector.process(arr)
-            if resultado.detections:
-                return True, len(resultado.detections)
-        return False, 0
+        gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+        gray = cv2.equalizeHist(gray)
+
+        ruta_cascada = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        clasificador = cv2.CascadeClassifier(ruta_cascada)
+
+        # Intento 1: parametros estandar
+        rostros = clasificador.detectMultiScale(gray, 1.1, 4)
+        if len(rostros) > 0:
+            return True, len(rostros)
+
+        # Intento 2: parametros mas flexibles
+        rostros = clasificador.detectMultiScale(gray, 1.05, 3, minSize=(30, 30))
+        if len(rostros) > 0:
+            return True, len(rostros)
+
+        # Intento 3: imagen ampliada al doble
+        alto, ancho = gray.shape
+        gray_grande = cv2.resize(gray, (ancho * 2, alto * 2))
+        rostros = clasificador.detectMultiScale(gray_grande, 1.1, 4)
+        return len(rostros) > 0, len(rostros)
     except Exception as e:
         st.error("Error en detector: " + str(e))
         return False, 0
-
-
-def subir_foto_verificacion(uid, imagen_bytes):
-    """Sube la foto al Storage de Supabase."""
-    restaurar_sesion()
-    try:
-        nombre_archivo = str(uid) + "_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".jpg"
-        supabase_client.storage.from_("verificaciones").upload(
-            nombre_archivo,
-            imagen_bytes,
-            {"content-type": "image/jpeg"},
-        )
-        url = supabase_client.storage.from_("verificaciones").get_public_url(nombre_archivo)
-        return url
-    except Exception:
-        return None
-
-
-def guardar_verificacion(uid, url_foto, estado):
-    restaurar_sesion()
-    try:
-        supabase_client.table("profiles").update({
-            "foto_verificacion_url": url_foto,
-            "verificacion_estado": estado,
-            "verificacion_fecha": datetime.now().isoformat(),
-        }).eq("id", uid).execute()
-        return True
-    except Exception:
-        return False
-
 
 # ============ ESTADO ============
 
