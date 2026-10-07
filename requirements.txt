@@ -1,7 +1,5 @@
 requests
 streamlit
 supabase
-supabase-auth
 pandas
 plotly
-pyarrow==16.1.0
