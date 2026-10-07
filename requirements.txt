@@ -3,3 +3,6 @@ streamlit
 supabase
 supabase-auth
 plotly
+opencv-python-headless
+numpy
+pillow
