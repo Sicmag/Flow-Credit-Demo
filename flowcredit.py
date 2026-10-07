@@ -318,7 +318,7 @@ def obtener_codigo_recuperacion(uid):
 # ============ RECONOCIMIENTO FACIAL CON MEDIAPIPE ============
 
 def detectar_rostro(imagen_bytes):
-    """Detector con MediaPipe: mucho mas preciso que OpenCV."""
+    """Detector con diagnostico de errores visible."""
     try:
         import mediapipe as mp
         from PIL import ImageOps
@@ -335,6 +335,7 @@ def detectar_rostro(imagen_bytes):
                 return True, len(resultado.detections)
         return False, 0
     except Exception as e:
+        st.error("Error en detector: " + str(e))
         return False, 0
 
 
