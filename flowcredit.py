@@ -1,5 +1,5 @@
 """
-FlowCredit Digital - Prototipo completo
+FlowCredit Digital - Prototipo
 Motor de decision crediticia con IA para emprendedores digitales.
 Proyecto SENA 2026.
 """
@@ -16,78 +16,11 @@ import streamlit as st
 from supabase import create_client
 
 
-# ============ PAGINA ============
-
 st.set_page_config(
     page_title="FlowCredit Digital",
     page_icon="💳",
     layout="wide",
 )
-
-
-# ============ CSS ============
-
-CSS = """
-<style>
-.main-header {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
-    padding: 2rem;
-    border-radius: 16px;
-    color: white;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-}
-.main-header h1 { color: white; margin: 0; font-size: 2.2rem; font-weight: 800; }
-.main-header p { color: #94a3b8; margin: 0.5rem 0 0 0; font-size: 1rem; }
-.metric-card {
-    background: white;
-    border-radius: 14px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-    border: 1px solid #e2e8f0;
-    height: 100%;
-}
-.metric-label {
-    color: #64748b;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    font-weight: 600;
-    margin-bottom: 0.4rem;
-}
-.metric-value {
-    font-size: 1.9rem;
-    font-weight: 800;
-    color: #0f172a;
-    margin: 0;
-    line-height: 1.1;
-}
-.metric-sub { color: #10b981; font-size: 0.85rem; font-weight: 600; margin-top: 0.3rem; }
-.decision-aprobado {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white; padding: 2rem; border-radius: 16px; text-align: center;
-    box-shadow: 0 10px 30px rgba(16,185,129,0.3);
-}
-.decision-rechazado {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    color: white; padding: 2rem; border-radius: 16px; text-align: center;
-    box-shadow: 0 10px 30px rgba(239,68,68,0.3);
-}
-.decision-revision {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white; padding: 2rem; border-radius: 16px; text-align: center;
-    box-shadow: 0 10px 30px rgba(245,158,11,0.3);
-}
-.decision-aprobado h1, .decision-rechazado h1, .decision-revision h1 {
-    color: white; font-size: 2.5rem; margin: 0;
-}
-.decision-aprobado p, .decision-rechazado p, .decision-revision p {
-    color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; font-size: 1.05rem;
-}
-.stButton > button { border-radius: 10px; font-weight: 700; padding: 0.6rem 1.2rem; }
-</style>
-"""
-st.markdown(CSS, unsafe_allow_html=True)
 
 
 # ============ CLAVES ============
@@ -178,17 +111,16 @@ RAZON_1: <texto corto>
 RAZON_2: <texto corto>
 RAZON_3: <texto corto>
 
-REGLAS CRITICAS DE COHERENCIA:
-- Si DECISION es RECHAZADO: MONTO_APROBADO = 0 y TASA_ANUAL = 0
-- Si DECISION es REVISION: MONTO_APROBADO maximo 1x ingresos, TASA 18-22%
-- Si DECISION es APROBADO: MONTO entre 1x y 5x ingresos, TASA 8-16%
-- El MONTO_APROBADO nunca puede exceder el monto solicitado
-- El score debe coincidir: rechazado menor a 500, revision 500-700, aprobado mayor a 700
+REGLAS CRITICAS:
+- RECHAZADO: MONTO_APROBADO = 0 y TASA = 0
+- REVISION: monto maximo 1x ingresos, tasa 18-22%
+- APROBADO: monto entre 1x y 5x ingresos, tasa 8-16%
+- Score: rechazado menor 500, revision 500-700, aprobado mayor 700
 
-CRITERIOS DE EVALUACION:
-- Menos de 6 meses de negocio: REVISION o RECHAZADO
-- Sin historial y sin fuentes digitales: REVISION
-- Monto solicitado mayor a 3x ingresos: reducir aprobado o REVISION
+CRITERIOS:
+- Menos de 6 meses: REVISION o RECHAZADO
+- Sin historial y sin fuentes: REVISION
+- Monto mayor a 3x ingresos: reducir o REVISION
 - Ingresos verificables + 12+ meses + historial: APROBADO
 """
 
@@ -390,12 +322,9 @@ if "datos_actuales" not in st.session_state:
 # ============ LOGIN ============
 
 if st.session_state["user"] is None:
-    st.markdown("""
-    <div class="main-header">
-        <h1>💳 FlowCredit Digital</h1>
-        <p>Solucion financiera innovadora para emprendedores digitales</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("💳 FlowCredit Digital")
+    st.caption("Solucion financiera innovadora para emprendedores digitales")
+    st.divider()
 
     tab1, tab2 = st.tabs(["🔐 Iniciar sesion", "✨ Crear cuenta"])
 
@@ -437,12 +366,14 @@ if st.session_state["user"] is None:
     st.stop()
 
 
-# ============ APP PRINCIPAL ============
+# ============ VARIABLES GLOBALES ============
 
 uid = st.session_state["user"]["id"]
 email = st.session_state["user"]["email"]
 nombre = email.split("@")[0] if email else "Emprendedor"
 
+
+# ============ MENU LATERAL ============
 
 with st.sidebar:
     st.markdown("### 👤 " + nombre)
@@ -465,16 +396,12 @@ with st.sidebar:
             st.session_state.pop(k, None)
         st.rerun()
 
-
+# ⬇️⬇️⬇️ AQUÍ CONTINÚA LA PARTE 2 ⬇️⬇️⬇️
 # ============ DASHBOARD ============
 
 if menu == "📊 Dashboard":
-    st.markdown("""
-    <div class="main-header">
-        <h1>📊 Dashboard</h1>
-        <p>Vista general de tu linea de credito digital</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("📊 Dashboard")
+    st.caption("Vista general de tu linea de credito digital")
 
     solicitudes = obtener_solicitudes(uid)
 
@@ -488,42 +415,18 @@ if menu == "📊 Dashboard":
 
     col1, col2, col3, col4 = st.columns(4)
 
-    linea_str = "$" + "{:,.0f}".format(linea_disponible).replace(",", ".")
     with col1:
-        st.markdown(
-            '<div class="metric-card"><p class="metric-label">Linea disponible</p>'
-            '<p class="metric-value">' + linea_str + '</p>'
-            '<p class="metric-sub">Actualizable</p></div>',
-            unsafe_allow_html=True
-        )
-
+        st.metric("Linea disponible", "$" + "{:,.0f}".format(linea_disponible).replace(",", "."))
     with col2:
-        st.markdown(
-            '<div class="metric-card"><p class="metric-label">Score crediticio</p>'
-            '<p class="metric-value">' + str(score_actual) + '/1000</p>'
-            '<p class="metric-sub">Buen perfil</p></div>',
-            unsafe_allow_html=True
-        )
-
+        st.metric("Score crediticio", str(score_actual) + "/1000")
     with col3:
-        st.markdown(
-            '<div class="metric-card"><p class="metric-label">Solicitudes</p>'
-            '<p class="metric-value">' + str(len(solicitudes)) + '</p>'
-            '<p class="metric-sub">Historial total</p></div>',
-            unsafe_allow_html=True
-        )
-
+        st.metric("Solicitudes", len(solicitudes))
     with col4:
         activas = sum(1 for s in solicitudes if s.get("decision") == "APROBADO")
-        st.markdown(
-            '<div class="metric-card"><p class="metric-label">Creditos activos</p>'
-            '<p class="metric-value">' + str(activas) + '</p>'
-            '<p class="metric-sub">Vigentes</p></div>',
-            unsafe_allow_html=True
-        )
+        st.metric("Creditos activos", activas)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.subheader("Flujo de caja ultimos 12 meses")
+    st.divider()
+    st.subheader("📈 Flujo de caja ultimos 12 meses")
 
     df = generar_flujo_caja(12, base=3000000)
     fig = go.Figure()
@@ -536,69 +439,241 @@ if menu == "📊 Dashboard":
         height=380,
         margin=dict(l=10, r=10, t=30, b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
-        xaxis=dict(tickfont=dict(size=10)),
     )
-    fig.update_yaxes(tickformat=",.0f", rangemode="tozero", tickfont=dict(size=10), gridcolor="#e2e8f0")
-    fig.update_xaxes(gridcolor="#f1f5f9")
     st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("Fuentes digitales conectadas")
+    st.subheader("🔗 Fuentes digitales conectadas")
     col_a, col_b, col_c, col_d = st.columns(4)
-    fuentes = [
-        ("💳 Stripe", "Conectado", "#10b981"),
-        ("🟣 Nequi", "Conectado", "#10b981"),
-        ("🔵 PayPal", "Conectado", "#10b981"),
-        ("🟢 Daviplata", "Pendiente", "#f59e0b"),
-    ]
-    for col, (nf, estado, color) in zip([col_a, col_b, col_c, col_d], fuentes):
-        partes = nf.split()
-        with col:
-            st.markdown(
-                '<div class="metric-card" style="text-align:center;">'
-                '<p style="font-size:1.8rem;margin:0;">' + partes[0] + '</p>'
-                '<p style="font-weight:700;margin:0.5rem 0 0 0;">' + partes[1] + '</p>'
-                '<p style="color:' + color + ';font-size:0.85rem;font-weight:600;margin:0.3rem 0 0 0;">' + estado + '</p>'
-                '</div>',
-                unsafe_allow_html=True
-            )
+    with col_a:
+        st.success("💳 Stripe - Conectado")
+    with col_b:
+        st.success("🟣 Nequi - Conectado")
+    with col_c:
+        st.success("🔵 PayPal - Conectado")
+    with col_d:
+        st.warning("🟢 Daviplata - Pendiente")
 
 
 # ============ VERIFICACION ============
 
 elif menu == "🛡️ Verificacion":
-    st.markdown("""
-    <div class="main-header">
-        <h1>🛡️ Verificacion de identidad</h1>
-        <p>Consulta tus datos verificados en bases oficiales</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("🛡️ Verificacion de identidad")
+    st.caption("Consulta tus datos verificados en bases oficiales")
 
     cliente = obtener_cliente_demo(email)
 
     if not cliente:
         st.warning("No se encontraron datos verificados para tu correo.")
         st.info("Correos demo disponibles:")
-        st.code("carlosandres3341@gmail.com\njesusviloria@gmail.com\njuan@test.com\nmaria@test.com\nana@test.com")
+        st.code("carlosandres3341@gmail.com")
+        st.code("jesusviloria@gmail.com")
+        st.code("juan@test.com")
+        st.code("maria@test.com")
+        st.code("ana@test.com")
     else:
-        st.markdown("""
-        <div style="background:linear-gradient(135deg,#10b981,#059669);
-                    padding:1.5rem;border-radius:14px;color:white;
-                    text-align:center;margin-bottom:1.5rem;">
-            <h2 style="margin:0;color:white;">Identidad Verificada</h2>
-            <p style="margin:0.5rem 0 0 0;color:rgba(255,255,255,0.9);">
-                Datos consultados en bases oficiales
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.success("✅ Identidad Verificada - Datos consultados en bases oficiales")
+        st.divider()
 
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown(
-                '<div class="metric-card"><p class="metric-label">Nombre completo</p>'
-                '<p style="font-size:1.15rem;font-weight:700;margin:0;color:#0f172a;">'
-                + cliente["nombre_completo"] + '</p></div><br>'
-                '<div class="metric-card"><p class="metric-label">Cedula</p>'
-                '<p style="font-size:1.15rem;font-weight:700;margin:0;color:#0f172a;">'
-                + cliente["cedula"] + '</p></div><br>'
-                '<div class="metric-card"><p class="metric
+            st.metric("Nombre completo", cliente["nombre_completo"])
+            st.metric("Cedula", cliente["cedula"])
+            st.metric("Fecha de nacimiento", str(cliente["fecha_nacimiento"]))
+            st.metric("Telefono", cliente["telefono"])
+
+        with col2:
+            st.metric("Direccion", cliente["direccion"])
+            st.metric("Ciudad", cliente["ciudad"])
+            st.metric("Ocupacion", cliente["ocupacion"])
+            st.metric("Score Datacredito", cliente["score_datacredito"])
+
+        st.divider()
+        st.subheader("🔐 Verificacion biometrica")
+
+        with st.expander("📸 Verificacion con reconocimiento facial", expanded=True):
+            st.info("En produccion, se solicitaria una foto del rostro para comparar con el documento.")
+            if st.button("📸 Simular verificacion facial", use_container_width=True):
+                with st.spinner("Analizando rostro..."):
+                    time.sleep(2)
+                st.success("✅ Rostro verificado correctamente")
+                st.caption("Coincide con documento de " + cliente["nombre_completo"])
+
+        st.divider()
+        st.subheader("🔑 Codigo de recuperacion")
+        st.caption("Sistema de recuperacion basado en claves criptograficas. No depende de SMS ni email.")
+
+        codigo_info = obtener_codigo_recuperacion(uid)
+
+        if codigo_info and codigo_info.get("recovery_code"):
+            st.warning("⚠️ Guarda este codigo en un lugar seguro. Es la unica forma de recuperar tu cuenta.")
+            st.code(codigo_info["recovery_code"], language=None)
+        else:
+            st.info("Aun no has generado tu codigo de recuperacion.")
+            if st.button("🔐 Generar codigo de recuperacion", use_container_width=True, type="primary"):
+                with st.spinner("Generando..."):
+                    codigo = guardar_codigo_recuperacion(uid)
+                if codigo:
+                    st.success("✅ Codigo generado")
+                    st.rerun()
+                else:
+                    st.error("No se pudo generar el codigo.")
+
+
+# ============ SOLICITAR CREDITO ============
+
+elif menu == "💳 Solicitar credito":
+    st.title("💳 Solicitar credito")
+    st.caption("Analisis con IA en menos de 24 horas")
+
+    cliente = obtener_cliente_demo(email)
+    if cliente:
+        st.success("✅ Cliente verificado: " + cliente["nombre_completo"] + " | Cedula " + cliente["cedula"] + " | Score " + str(cliente["score_datacredito"]))
+    else:
+        st.warning("⚠️ No tienes verificacion previa. Ve a la seccion Verificacion.")
+
+    if st.session_state["resultado_actual"] is None:
+        ingresos_default = int(cliente["ingresos_declarados"]) if cliente else 3000000
+
+        with st.form("solicitud"):
+            col1, col2 = st.columns(2)
+
+            with col1:
+                tipo = st.selectbox(
+                    "Tipo de negocio digital",
+                    ["E-commerce", "Creador de contenido", "Servicios digitales", "SaaS / App", "Marketing digital", "Otro"],
+                )
+                ingresos = st.number_input(
+                    "Ingresos mensuales promedio (COP)",
+                    min_value=500000, max_value=50000000,
+                    value=ingresos_default, step=100000,
+                )
+                meses = st.number_input("Meses con el negocio", min_value=1, max_value=120, value=12)
+
+            with col2:
+                monto = st.number_input(
+                    "Monto solicitado (COP)",
+                    min_value=100000, max_value=5000000,
+                    value=1000000, step=100000,
+                )
+                plazo = st.selectbox(
+                    "Plazo",
+                    [30, 60, 90, 120, 180],
+                    format_func=lambda x: str(x) + " dias",
+                )
+                historial = st.selectbox(
+                    "Historial de pagos previos",
+                    ["Sin historial", "1 credito pagado", "2-3 creditos pagados", "Mas de 3 creditos"],
+                )
+
+            fuentes = st.multiselect(
+                "Fuentes digitales conectadas",
+                ["Stripe", "Nequi", "Daviplata", "PayPal", "Wompi", "Mercado Pago"],
+                default=["Stripe", "Nequi"],
+            )
+
+            enviado = st.form_submit_button("🔍 Analizar con IA", use_container_width=True, type="primary")
+
+        if enviado:
+            if not fuentes:
+                st.warning("Debes conectar al menos una fuente digital.")
+            else:
+                datos = {
+                    "tipo": tipo,
+                    "ingresos": ingresos,
+                    "meses": meses,
+                    "monto": monto,
+                    "plazo": plazo,
+                    "historial": historial,
+                    "fuentes": ", ".join(fuentes),
+                }
+
+                with st.spinner("🤖 Analizando tu perfil con inteligencia artificial..."):
+                    try:
+                        texto_ia = analizar_con_ia(datos)
+                        resultado = parsear_respuesta(texto_ia, ingresos=ingresos)
+                    except Exception as e:
+                        st.error("Error al analizar: " + str(e))
+                        st.stop()
+
+                guardar_solicitud(uid, datos, resultado)
+                st.session_state["resultado_actual"] = resultado
+                st.session_state["datos_actuales"] = datos
+                st.rerun()
+
+    else:
+        resultado = st.session_state["resultado_actual"]
+        decision = resultado["decision"]
+
+        if decision == "APROBADO":
+            st.success("✅ APROBADO - Tu credito ha sido aprobado automaticamente")
+        elif decision == "RECHAZADO":
+            st.error("❌ RECHAZADO - No pudimos aprobar tu solicitud en este momento")
+        else:
+            st.warning("⏳ EN REVISION - Un analista revisara tu caso en las proximas 24 horas")
+
+        st.divider()
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric("Score crediticio", str(resultado["score"]) + "/1000")
+        with col2:
+            st.metric("Monto aprobado", "$" + "{:,.0f}".format(resultado["monto_aprobado"]).replace(",", "."))
+        with col3:
+            st.metric("Tasa anual", str(resultado["tasa_anual"]) + "%")
+
+        st.divider()
+
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=resultado["score"],
+            domain={"x": [0, 1], "y": [0, 1]},
+            title={"text": "Score Crediticio"},
+            gauge={
+                "axis": {"range": [0, 1000]},
+                "bar": {"color": "#0f172a"},
+                "steps": [
+                    {"range": [0, 400], "color": "#fee2e2"},
+                    {"range": [400, 650], "color": "#fef3c7"},
+                    {"range": [650, 850], "color": "#d1fae5"},
+                    {"range": [850, 1000], "color": "#a7f3d0"},
+                ],
+            },
+        ))
+        fig_gauge.update_layout(height=280, margin=dict(l=20, r=20, t=40, b=20))
+        st.plotly_chart(fig_gauge, use_container_width=True)
+
+        st.subheader("📋 Razones de la decision")
+        for i, razon in enumerate(resultado["razones"], 1):
+            st.markdown("**" + str(i) + ".** " + razon)
+
+        st.divider()
+        if st.button("🔄 Solicitar otro credito", use_container_width=True):
+            st.session_state["resultado_actual"] = None
+            st.session_state["datos_actuales"] = None
+            st.rerun()
+
+
+# ============ HISTORIAL ============
+
+elif menu == "📋 Historial":
+    st.title("📋 Historial de solicitudes")
+    st.caption("Todas tus solicitudes anteriores")
+
+    solicitudes = obtener_solicitudes(uid)
+
+    if not solicitudes:
+        st.info("Aun no has realizado ninguna solicitud de credito.")
+    else:
+        filas = []
+        for s in solicitudes:
+            filas.append({
+                "Fecha": (s.get("created_at") or "")[:10],
+                "Monto solicitado": "$" + "{:,.0f}".format(s["monto_solicitado"]).replace(",", "."),
+                "Monto aprobado": "$" + "{:,.0f}".format(s.get("monto_aprobado") or 0).replace(",", "."),
+                "Score": s.get("score", 0),
+                "Decision": s.get("decision", ""),
+                "Tasa": str(s.get("tasa_sugerida", 0)) + "%",
+            })
+        df = pd.DataFrame(filas)
+        st.dataframe(df, use_container_width=True, hide_index=True)
