@@ -4,15 +4,18 @@ Motor de decision crediticia con IA para emprendedores digitales.
 Proyecto SENA 2026.
 """
 
+import io
 import random
 import string
 import time
 from datetime import datetime, timedelta
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import requests
 import streamlit as st
+from PIL import Image
 from supabase import create_client
 
 
@@ -237,7 +240,7 @@ def generar_flujo_caja(meses=12, base=3000000):
     return pd.DataFrame(datos)
 
 
-# ============ BASE DE DATOS ============
+# ============ BD: SOLICITUDES ============
 
 def guardar_solicitud(uid, datos, resultado):
     restaurar_sesion()
@@ -268,6 +271,8 @@ def obtener_solicitudes(uid):
         return []
 
 
+# ============ BD: CLIENTES DEMO ============
+
 def obtener_cliente_demo(email):
     restaurar_sesion()
     try:
@@ -276,6 +281,8 @@ def obtener_cliente_demo(email):
     except Exception:
         return None
 
+
+# ============ BD: CODIGO RECUPERACION ============
 
 def generar_codigo_recuperacion():
     chars = string.ascii_uppercase + string.digits
@@ -307,6 +314,56 @@ def obtener_codigo_recuperacion(uid):
         return r.data[0] if r.data else None
     except Exception:
         return None
+
+
+# ============ RECONOCIMIENTO FACIAL ============
+
+def detectar_rostro(imagen_bytes):
+    """Detecta si hay un rostro en la imagen usando OpenCV."""
+    try:
+        import cv2
+
+        img = Image.open(io.BytesIO(imagen_bytes)).convert("RGB")
+        arr = np.array(img)
+        gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+
+        clasificador = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        )
+        rostros = clasificador.detectMultiScale(gray, 1.1, 4)
+        return len(rostros) > 0, len(rostros)
+    except Exception:
+        return False, 0
+
+
+def subir_foto_verificacion(uid, imagen_bytes):
+    """Sube la foto al Storage de Supabase."""
+    restaurar_sesion()
+    try:
+        nombre_archivo = str(uid) + "_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".jpg"
+        supabase_client.storage.from_("verificaciones").upload(
+            nombre_archivo,
+            imagen_bytes,
+            {"content-type": "image/jpeg"},
+        )
+        url = supabase_client.storage.from_("verificaciones").get_public_url(nombre_archivo)
+        return url
+    except Exception:
+        return None
+
+
+def guardar_verificacion(uid, url_foto, estado):
+    """Guarda el resultado de la verificacion en profiles."""
+    restaurar_sesion()
+    try:
+        supabase_client.table("profiles").update({
+            "foto_verificacion_url": url_foto,
+            "verificacion_estado": estado,
+            "verificacion_fecha": datetime.now().isoformat(),
+        }).eq("id", uid).execute()
+        return True
+    except Exception:
+        return False
 
 
 # ============ ESTADO ============
@@ -373,7 +430,7 @@ email = st.session_state["user"]["email"]
 nombre = email.split("@")[0] if email else "Emprendedor"
 
 
-# ============ MENU LATERAL ============
+# ============ SIDEBAR ============
 
 with st.sidebar:
     st.markdown("### 👤 " + nombre)
@@ -396,7 +453,7 @@ with st.sidebar:
             st.session_state.pop(k, None)
         st.rerun()
 
-# ⬇️⬇️⬇️ AQUÍ CONTINÚA LA PARTE 2 ⬇️⬇️⬇️
+# ⬇️ CONTINUA EN LA PARTE 2 ⬇️
 # ============ DASHBOARD ============
 
 if menu == "📊 Dashboard":
@@ -458,7 +515,7 @@ if menu == "📊 Dashboard":
 
 elif menu == "🛡️ Verificacion":
     st.title("🛡️ Verificacion de identidad")
-    st.caption("Consulta tus datos verificados en bases oficiales")
+    st.caption("Consulta tus datos verificados y completa tu verificacion biometrica")
 
     cliente = obtener_cliente_demo(email)
 
@@ -489,19 +546,35 @@ elif menu == "🛡️ Verificacion":
             st.metric("Score Datacredito", cliente["score_datacredito"])
 
         st.divider()
-        st.subheader("🔐 Verificacion biometrica")
+        st.subheader("🔐 Verificacion biometrica con reconocimiento facial")
+        st.info("Toma una foto de tu rostro. El sistema verificara que sea una persona real y guardara la evidencia.")
 
-        with st.expander("📸 Verificacion con reconocimiento facial", expanded=True):
-            st.info("En produccion, se solicitaria una foto del rostro para comparar con el documento.")
-            if st.button("📸 Simular verificacion facial", use_container_width=True):
-                with st.spinner("Analizando rostro..."):
-                    time.sleep(2)
-                st.success("✅ Rostro verificado correctamente")
-                st.caption("Coincide con documento de " + cliente["nombre_completo"])
+        foto = st.camera_input("📸 Toma una foto de tu rostro")
+
+        if foto is not None:
+            imagen_bytes = foto.getvalue()
+
+            with st.spinner("Analizando rostro..."):
+                tiene_rostro, cantidad = detectar_rostro(imagen_bytes)
+
+            if not tiene_rostro:
+                st.error("❌ No se reconoce un rostro en la imagen. Asegurate de estar frente a la camara, con buena luz y sin obstaculos.")
+            else:
+                st.success("✅ Rostro detectado (" + str(cantidad) + " rostro(s))")
+
+                with st.spinner("Guardando verificacion..."):
+                    url = subir_foto_verificacion(uid, imagen_bytes)
+                    if url:
+                        guardar_verificacion(uid, url, "verificado")
+                        st.success("🎉 Identidad verificada correctamente")
+                        st.caption("Foto guardada y verificacion registrada.")
+                        st.balloons()
+                    else:
+                        st.warning("Rostro detectado, pero no se pudo guardar la foto.")
 
         st.divider()
         st.subheader("🔑 Codigo de recuperacion")
-        st.caption("Sistema de recuperacion basado en claves criptograficas. No depende de SMS ni email.")
+        st.caption("Sistema de recuperacion basado en claves criptograficas.")
 
         codigo_info = obtener_codigo_recuperacion(uid)
 
