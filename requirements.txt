@@ -1,5 +1,6 @@
 requests
 streamlit
 supabase
+supabase-auth
 pandas
 plotly
