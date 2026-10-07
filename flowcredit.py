@@ -183,7 +183,7 @@ restaurar_sesion()
 # ============ IA ============
 
 MODELO_GEMINI = "gemini-3.8-flash"
-MODELO_GROQ = "llama-3.3-70b-versatile"
+MODELO_GROQ = "qwen/qwen3.8-27b"
 
 URL_GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/" + MODELO_GEMINI + ":generateContent"
 URL_GROQ = "https://api.groq.com/openai/v1/chat/completions"
