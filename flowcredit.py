@@ -1,6 +1,6 @@
 """
-FlowCredit Digital - Prototipo con reconocimiento facial MediaPipe
-Proyecto SENA 2026.
+FlowCredit Digital - Prototipo completo (Parte 1/2)
+Base, funciones y login.
 """
 
 import io
@@ -14,7 +14,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageOps
 from supabase import create_client
 
 
@@ -315,13 +315,11 @@ def obtener_codigo_recuperacion(uid):
         return None
 
 
-# ============ RECONOCIMIENTO FACIAL CON MEDIAPIPE ============
+# ============ RECONOCIMIENTO FACIAL ============
 
 def detectar_rostro(imagen_bytes):
-    """Deteccion facial con OpenCV headless (estable en Streamlit Cloud)."""
     try:
         import cv2
-        from PIL import ImageOps
 
         img = Image.open(io.BytesIO(imagen_bytes))
         img = ImageOps.exif_transpose(img)
@@ -331,27 +329,221 @@ def detectar_rostro(imagen_bytes):
         gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
         gray = cv2.equalizeHist(gray)
 
-        ruta_cascada = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        clasificador = cv2.CascadeClassifier(ruta_cascada)
+        ruta = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        clasificador = cv2.CascadeClassifier(ruta)
 
-        # Intento 1: parametros estandar
         rostros = clasificador.detectMultiScale(gray, 1.1, 4)
         if len(rostros) > 0:
             return True, len(rostros)
 
-        # Intento 2: parametros mas flexibles
         rostros = clasificador.detectMultiScale(gray, 1.05, 3, minSize=(30, 30))
         if len(rostros) > 0:
             return True, len(rostros)
 
-        # Intento 3: imagen ampliada al doble
         alto, ancho = gray.shape
-        gray_grande = cv2.resize(gray, (ancho * 2, alto * 2))
-        rostros = clasificador.detectMultiScale(gray_grande, 1.1, 4)
+        gray2 = cv2.resize(gray, (ancho * 2, alto * 2))
+        rostros = clasificador.detectMultiScale(gray2, 1.1, 4)
         return len(rostros) > 0, len(rostros)
     except Exception as e:
         st.error("Error en detector: " + str(e))
         return False, 0
+
+
+def subir_foto_verificacion(uid, imagen_bytes):
+    restaurar_sesion()
+    try:
+        nombre = str(uid) + "_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".jpg"
+        supabase_client.storage.from_("verificaciones").upload(
+            nombre, imagen_bytes, {"content-type": "image/jpeg"}
+        )
+        return supabase_client.storage.from_("verificaciones").get_public_url(nombre)
+    except Exception:
+        return None
+
+
+def guardar_verificacion(uid, url_foto, estado):
+    restaurar_sesion()
+    try:
+        supabase_client.table("profiles").update({
+            "foto_verificacion_url": url_foto,
+            "verificacion_estado": estado,
+            "verificacion_fecha": datetime.now().isoformat(),
+        }).eq("id", uid).execute()
+        return True
+    except Exception:
+        return False
+
+
+# ============ CREDITOS Y CUOTAS ============
+
+def calcular_plan_pagos(monto, tasa_anual, plazo_dias):
+    if plazo_dias <= 30:
+        num_cuotas = 1
+    elif plazo_dias <= 60:
+        num_cuotas = 2
+    elif plazo_dias <= 90:
+        num_cuotas = 3
+    elif plazo_dias <= 120:
+        num_cuotas = 4
+    else:
+        num_cuotas = 6
+
+    tasa_mensual = (tasa_anual / 100.0) / 12.0
+    if tasa_mensual <= 0:
+        valor_cuota = monto / num_cuotas
+    else:
+        factor = (1 + tasa_mensual) ** num_cuotas
+        valor_cuota = monto * (tasa_mensual * factor) / (factor - 1)
+
+    total_pagar = valor_cuota * num_cuotas
+    total_intereses = total_pagar - monto
+
+    return {
+        "num_cuotas": num_cuotas,
+        "valor_cuota": round(valor_cuota, 2),
+        "total_pagar": round(total_pagar, 2),
+        "total_intereses": round(total_intereses, 2),
+        "tasa_mensual": round(tasa_mensual * 100, 4),
+    }
+
+
+def crear_credito(uid, solicitud_id, monto, tasa, plazo):
+    restaurar_sesion()
+    plan = calcular_plan_pagos(monto, tasa, plazo)
+    try:
+        resp = supabase_client.table("creditos").insert({
+            "user_id": uid,
+            "solicitud_id": solicitud_id,
+            "monto_aprobado": float(monto),
+            "tasa_anual": float(tasa),
+            "plazo_dias": int(plazo),
+            "num_cuotas": plan["num_cuotas"],
+            "valor_cuota": plan["valor_cuota"],
+            "total_intereses": plan["total_intereses"],
+            "total_pagar": plan["total_pagar"],
+            "saldo_pendiente": plan["total_pagar"],
+            "estado": "activo",
+        }).execute()
+
+        if not resp.data:
+            return None
+
+        credito_id = resp.data[0]["id"]
+        hoy = datetime.now()
+        cuotas = []
+        for i in range(1, plan["num_cuotas"] + 1):
+            dias_adelanto = int((plazo / plan["num_cuotas"]) * i)
+            fecha_venc = (hoy + timedelta(days=dias_adelanto)).date().isoformat()
+            capital_cuota = monto / plan["num_cuotas"]
+            interes_cuota = plan["valor_cuota"] - capital_cuota
+
+            cuotas.append({
+                "credito_id": credito_id,
+                "user_id": uid,
+                "numero": i,
+                "valor": plan["valor_cuota"],
+                "capital": round(capital_cuota, 2),
+                "intereses": round(interes_cuota, 2),
+                "fecha_vencimiento": fecha_venc,
+                "estado": "pendiente",
+            })
+
+        supabase_client.table("cuotas").insert(cuotas).execute()
+        return credito_id
+    except Exception as e:
+        st.error("Error creando credito: " + str(e))
+        return None
+
+
+def obtener_creditos_activos(uid):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("creditos").select("*") \
+            .eq("user_id", uid).eq("estado", "activo") \
+            .order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception:
+        return []
+
+
+def obtener_todos_creditos(uid):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("creditos").select("*") \
+            .eq("user_id", uid).order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception:
+        return []
+
+
+def obtener_cuotas(credito_id):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("cuotas").select("*") \
+            .eq("credito_id", credito_id).order("numero").execute()
+        return r.data or []
+    except Exception:
+        return []
+
+
+def pagar_cuota(cuota_id, credito_id):
+    restaurar_sesion()
+    try:
+        supabase_client.table("cuotas").update({
+            "estado": "pagada",
+            "fecha_pago": datetime.now().isoformat(),
+        }).eq("id", cuota_id).execute()
+
+        cuotas = obtener_cuotas(credito_id)
+        pagadas = sum(1 for c in cuotas if c["estado"] == "pagada")
+        saldo = sum(c["valor"] for c in cuotas if c["estado"] == "pendiente")
+
+        estado = "pagado" if pagadas >= len(cuotas) else "activo"
+
+        supabase_client.table("creditos").update({
+            "cuotas_pagadas": pagadas,
+            "saldo_pendiente": round(saldo, 2),
+            "estado": estado,
+        }).eq("id", credito_id).execute()
+
+        return True
+    except Exception:
+        return False
+
+
+def obtener_estado_onboarding(uid):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("profiles") \
+            .select("onboarding_completado, terminos_aceptados") \
+            .eq("id", uid).execute()
+        return r.data[0] if r.data else {"onboarding_completado": False, "terminos_aceptados": False}
+    except Exception:
+        return {"onboarding_completado": False, "terminos_aceptados": False}
+
+
+def completar_onboarding(uid):
+    restaurar_sesion()
+    try:
+        supabase_client.table("profiles").update({
+            "onboarding_completado": True,
+        }).eq("id", uid).execute()
+        return True
+    except Exception:
+        return False
+
+
+def aceptar_terminos(uid):
+    restaurar_sesion()
+    try:
+        supabase_client.table("profiles").update({
+            "terminos_aceptados": True,
+            "terminos_fecha": datetime.now().isoformat(),
+        }).eq("id", uid).execute()
+        return True
+    except Exception:
+        return False
+
 
 # ============ ESTADO ============
 
@@ -361,6 +553,10 @@ if "resultado_actual" not in st.session_state:
     st.session_state["resultado_actual"] = None
 if "datos_actuales" not in st.session_state:
     st.session_state["datos_actuales"] = None
+if "onboarding_paso" not in st.session_state:
+    st.session_state["onboarding_paso"] = 1
+if "credito_creado" not in st.session_state:
+    st.session_state["credito_creado"] = False
 
 
 # ============ LOGIN ============
@@ -417,6 +613,41 @@ email = st.session_state["user"]["email"]
 nombre = email.split("@")[0] if email else "Emprendedor"
 
 
+# ============ ONBOARDING ============
+
+estado_onb = obtener_estado_onboarding(uid)
+if not estado_onb.get("onboarding_completado"):
+    st.title("👋 Bienvenido a FlowCredit Digital")
+    st.caption("Tu solucion de credito para emprendedores digitales")
+    st.divider()
+
+    paso = st.session_state.get("onboarding_paso", 1)
+
+    if paso == 1:
+        st.subheader("💳 Que es FlowCredit?")
+        st.write("FlowCredit Digital es una plataforma que analiza tu flujo de caja digital y te ofrece credito personalizado en menos de 24 horas.")
+        if st.button("Siguiente", use_container_width=True, type="primary"):
+            st.session_state["onboarding_paso"] = 2
+            st.rerun()
+    elif paso == 2:
+        st.subheader("🤖 Inteligencia artificial")
+        st.write("Nuestro motor de IA analiza tus ingresos digitales y calcula tu score crediticio en segundos.")
+        if st.button("Siguiente", use_container_width=True, type="primary"):
+            st.session_state["onboarding_paso"] = 3
+            st.rerun()
+    elif paso == 3:
+        st.subheader("📋 Solo 3 pasos")
+        st.write("1. Verifica tu identidad con reconocimiento facial")
+        st.write("2. Solicita tu credito en 1 minuto")
+        st.write("3. Recibe el desembolso en menos de 24 horas")
+        if st.button("Empezar ahora", use_container_width=True, type="primary"):
+            completar_onboarding(uid)
+            st.session_state["onboarding_paso"] = 1
+            st.rerun()
+
+    st.stop()
+
+
 # ============ SIDEBAR ============
 
 with st.sidebar:
@@ -426,7 +657,14 @@ with st.sidebar:
 
     menu = st.radio(
         "Menu",
-        ["📊 Dashboard", "🛡️ Verificacion", "💳 Solicitar credito", "📋 Historial"],
+        [
+            "📊 Dashboard",
+            "🛡️ Verificacion",
+            "💳 Solicitar credito",
+            "💼 Mis creditos",
+            "📋 Historial",
+            "📜 Terminos",
+        ],
         label_visibility="collapsed",
     )
 
@@ -436,11 +674,12 @@ with st.sidebar:
             supabase_client.auth.sign_out()
         except Exception:
             pass
-        for k in ["user", "access_token", "refresh_token", "resultado_actual", "datos_actuales"]:
+        for k in ["user", "access_token", "refresh_token", "resultado_actual", "datos_actuales", "credito_creado"]:
             st.session_state.pop(k, None)
         st.rerun()
 
-# ⬇️ CONTINUA EN LA PARTE 2 ⬇️
+# ⬇️ AQUI CONTINUA LA PARTE 2 ⬇️
+
 
 # ============ DASHBOARD ============
 
@@ -449,6 +688,7 @@ if menu == "📊 Dashboard":
     st.caption("Vista general de tu linea de credito digital")
 
     solicitudes = obtener_solicitudes(uid)
+    creditos = obtener_creditos_activos(uid)
 
     linea_disponible = 2500000
     score_actual = 742
@@ -459,7 +699,6 @@ if menu == "📊 Dashboard":
             linea_disponible = int(aprobadas[0]["monto_aprobado"])
 
     col1, col2, col3, col4 = st.columns(4)
-
     with col1:
         st.metric("Linea disponible", "$" + "{:,.0f}".format(linea_disponible).replace(",", "."))
     with col2:
@@ -467,8 +706,7 @@ if menu == "📊 Dashboard":
     with col3:
         st.metric("Solicitudes", len(solicitudes))
     with col4:
-        activas = sum(1 for s in solicitudes if s.get("decision") == "APROBADO")
-        st.metric("Creditos activos", activas)
+        st.metric("Creditos activos", len(creditos))
 
     st.divider()
     st.subheader("📈 Flujo de caja ultimos 12 meses")
@@ -520,13 +758,11 @@ elif menu == "🛡️ Verificacion":
         st.divider()
 
         col1, col2 = st.columns(2)
-
         with col1:
             st.metric("Nombre completo", cliente["nombre_completo"])
             st.metric("Cedula", cliente["cedula"])
             st.metric("Fecha de nacimiento", str(cliente["fecha_nacimiento"]))
             st.metric("Telefono", cliente["telefono"])
-
         with col2:
             st.metric("Direccion", cliente["direccion"])
             st.metric("Ciudad", cliente["ciudad"])
@@ -535,27 +771,24 @@ elif menu == "🛡️ Verificacion":
 
         st.divider()
         st.subheader("🔐 Verificacion biometrica con reconocimiento facial")
-        st.info("Toma una foto de tu rostro de frente, con buena luz. El sistema detectara tu rostro y guardara la evidencia.")
+        st.info("Toma una foto de tu rostro de frente, con buena luz.")
 
         foto = st.camera_input("📸 Toma una foto de tu rostro")
 
         if foto is not None:
             imagen_bytes = foto.getvalue()
-
-            with st.spinner("Analizando rostro con MediaPipe..."):
+            with st.spinner("Analizando rostro..."):
                 tiene_rostro, cantidad = detectar_rostro(imagen_bytes)
 
             if not tiene_rostro:
-                st.error("❌ No se reconoce un rostro en la imagen. Intenta con mejor luz y rostro de frente.")
+                st.error("❌ No se reconoce un rostro. Intenta con mejor luz y rostro de frente.")
             else:
                 st.success("✅ Rostro detectado (" + str(cantidad) + " rostro(s))")
-
                 with st.spinner("Guardando verificacion..."):
                     url = subir_foto_verificacion(uid, imagen_bytes)
                     if url:
                         guardar_verificacion(uid, url, "verificado")
                         st.success("🎉 Identidad verificada correctamente")
-                        st.caption("Foto guardada y verificacion registrada.")
                         st.balloons()
                     else:
                         st.warning("Rostro detectado, pero no se pudo guardar la foto.")
@@ -565,7 +798,6 @@ elif menu == "🛡️ Verificacion":
         st.caption("Sistema de recuperacion basado en claves criptograficas.")
 
         codigo_info = obtener_codigo_recuperacion(uid)
-
         if codigo_info and codigo_info.get("recovery_code"):
             st.warning("⚠️ Guarda este codigo en un lugar seguro.")
             st.code(codigo_info["recovery_code"], language=None)
@@ -598,7 +830,6 @@ elif menu == "💳 Solicitar credito":
 
         with st.form("solicitud"):
             col1, col2 = st.columns(2)
-
             with col1:
                 tipo = st.selectbox(
                     "Tipo de negocio digital",
@@ -610,7 +841,6 @@ elif menu == "💳 Solicitar credito":
                     value=ingresos_default, step=100000,
                 )
                 meses = st.number_input("Meses con el negocio", min_value=1, max_value=120, value=12)
-
             with col2:
                 monto = st.number_input(
                     "Monto solicitado (COP)",
@@ -649,7 +879,7 @@ elif menu == "💳 Solicitar credito":
                     "fuentes": ", ".join(fuentes),
                 }
 
-                with st.spinner("🤖 Analizando tu perfil con inteligencia artificial..."):
+                with st.spinner("🤖 Analizando tu perfil..."):
                     try:
                         texto_ia = analizar_con_ia(datos)
                         resultado = parsear_respuesta(texto_ia, ingresos=ingresos)
@@ -664,18 +894,30 @@ elif menu == "💳 Solicitar credito":
 
     else:
         resultado = st.session_state["resultado_actual"]
+        datos = st.session_state["datos_actuales"]
         decision = resultado["decision"]
 
         if decision == "APROBADO":
             st.success("✅ APROBADO - Tu credito ha sido aprobado automaticamente")
         elif decision == "RECHAZADO":
-            st.error("❌ RECHAZADO - No pudimos aprobar tu solicitud en este momento")
+            st.error("❌ RECHAZADO - No pudimos aprobar tu solicitud")
         else:
-            st.warning("⏳ EN REVISION - Un analista revisara tu caso en las proximas 24 horas")
+            st.warning("⏳ EN REVISION - Un analista revisara tu caso")
+
+        if decision == "APROBADO" and not st.session_state.get("credito_creado", False):
+            solicitudes = obtener_solicitudes(uid)
+            if solicitudes:
+                ultima = solicitudes[0]
+                credito_id = crear_credito(
+                    uid, ultima["id"], resultado["monto_aprobado"],
+                    resultado["tasa_anual"], datos["plazo"],
+                )
+                if credito_id:
+                    st.session_state["credito_creado"] = True
+                    st.info("💼 Tu credito fue registrado. Ve a 'Mis creditos' para ver el plan de pagos.")
 
         st.divider()
         col1, col2, col3 = st.columns(3)
-
         with col1:
             st.metric("Score crediticio", str(resultado["score"]) + "/1000")
         with col2:
@@ -683,8 +925,19 @@ elif menu == "💳 Solicitar credito":
         with col3:
             st.metric("Tasa anual", str(resultado["tasa_anual"]) + "%")
 
-        st.divider()
+        if decision == "APROBADO" and resultado["monto_aprobado"] > 0:
+            plan = calcular_plan_pagos(resultado["monto_aprobado"], resultado["tasa_anual"], datos["plazo"])
+            st.divider()
+            st.subheader("📋 Plan de pagos")
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                st.metric("Cuotas", plan["num_cuotas"])
+            with col_b:
+                st.metric("Valor por cuota", "$" + "{:,.0f}".format(plan["valor_cuota"]).replace(",", "."))
+            with col_c:
+                st.metric("Total a pagar", "$" + "{:,.0f}".format(plan["total_pagar"]).replace(",", "."))
 
+        st.divider()
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=resultado["score"],
@@ -712,7 +965,72 @@ elif menu == "💳 Solicitar credito":
         if st.button("🔄 Solicitar otro credito", use_container_width=True):
             st.session_state["resultado_actual"] = None
             st.session_state["datos_actuales"] = None
+            st.session_state["credito_creado"] = False
             st.rerun()
+
+
+# ============ MIS CREDITOS ============
+
+elif menu == "💼 Mis creditos":
+    st.title("💼 Mis creditos")
+    st.caption("Gestiona tus creditos y pagos")
+
+    creditos = obtener_todos_creditos(uid)
+
+    if not creditos:
+        st.info("No tienes creditos registrados. Ve a 'Solicitar credito' para empezar.")
+    else:
+        for cred in creditos:
+            icono = "🟢" if cred["estado"] == "activo" else "✅"
+            st.subheader(icono + " Credito #" + str(cred["id"]))
+
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Monto", "$" + "{:,.0f}".format(cred["monto_aprobado"]).replace(",", "."))
+            with col2:
+                st.metric("Tasa anual", str(cred["tasa_anual"]) + "%")
+            with col3:
+                st.metric("Saldo pendiente", "$" + "{:,.0f}".format(cred["saldo_pendiente"]).replace(",", "."))
+            with col4:
+                st.metric("Cuotas pagadas", str(cred["cuotas_pagadas"]) + "/" + str(cred["num_cuotas"]))
+
+            progreso = cred["cuotas_pagadas"] / cred["num_cuotas"]
+            st.progress(progreso)
+
+            cuotas = obtener_cuotas(cred["id"])
+
+            with st.expander("📋 Ver plan de pagos completo"):
+                filas = []
+                for c in cuotas:
+                    filas.append({
+                        "N": c["numero"],
+                        "Valor": "$" + "{:,.0f}".format(c["valor"]).replace(",", "."),
+                        "Capital": "$" + "{:,.0f}".format(c["capital"]).replace(",", "."),
+                        "Intereses": "$" + "{:,.0f}".format(c["intereses"]).replace(",", "."),
+                        "Vencimiento": c["fecha_vencimiento"],
+                        "Estado": "✅ Pagada" if c["estado"] == "pagada" else "⏳ Pendiente",
+                    })
+                st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
+
+            pendientes = [c for c in cuotas if c["estado"] == "pendiente"]
+            if pendientes:
+                siguiente = pendientes[0]
+                st.info(
+                    "📅 Proxima cuota: **" + str(siguiente["numero"]) + "** · "
+                    "Vence el " + siguiente["fecha_vencimiento"] + " · "
+                    "Valor: $" + "{:,.0f}".format(siguiente["valor"]).replace(",", ".")
+                )
+                if st.button("💳 Pagar cuota " + str(siguiente["numero"]), key="pagar_" + str(cred["id"])):
+                    if pagar_cuota(siguiente["id"], cred["id"]):
+                        st.success("✅ Cuota pagada correctamente")
+                        st.balloons()
+                        st.rerun()
+                    else:
+                        st.error("No se pudo procesar el pago")
+            else:
+                st.success("🎉 Credito pagado completamente")
+
+            st.divider()
 
 
 # ============ HISTORIAL ============
@@ -736,5 +1054,59 @@ elif menu == "📋 Historial":
                 "Decision": s.get("decision", ""),
                 "Tasa": str(s.get("tasa_sugerida", 0)) + "%",
             })
-        df = pd.DataFrame(filas)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
+
+
+# ============ TERMINOS ============
+
+elif menu == "📜 Terminos":
+    st.title("📜 Terminos y politica de privacidad")
+    st.caption("Documento legal de uso de la plataforma")
+
+    with st.expander("Terminos de uso", expanded=True):
+        st.markdown("""
+        **1. Aceptacion**
+        Al usar FlowCredit Digital aceptas los presentes terminos.
+
+        **2. Naturaleza del servicio**
+        FlowCredit Digital es un prototipo demostrativo. No presta dinero real.
+        Las decisiones de credito mostradas son simulaciones con fines academicos.
+
+        **3. Datos personales**
+        Tratamos tus datos conforme a la Ley 1581 de 2012. Los datos biometricos
+        se almacenan solo como evidencia de verificacion.
+
+        **4. Uso de IA**
+        El motor de decision usa modelos de inteligencia artificial. Los resultados
+        pueden variar segun la informacion proporcionada.
+        """)
+
+    with st.expander("Politica de tratamiento de datos"):
+        st.markdown("""
+        **Responsable:** FlowCredit Digital - Proyecto SENA 2026
+
+        **Finalidad:** Analisis de credito y verificacion de identidad.
+
+        **Datos recolectados:**
+        - Nombre y correo electronico
+        - Documento de identidad (simulado)
+        - Datos financieros declarados
+        - Fotografia de verificacion facial
+
+        **Derechos del titular (Ley 1581):**
+        - Conocer, actualizar y rectificar tus datos
+        - Solicitar prueba de la autorizacion
+        - Revocar la autorizacion
+        - Presentar quejas ante la SIC
+
+        **Contacto:** privacidad@flowcredit.com
+        """)
+
+    estado = obtener_estado_onboarding(uid)
+    if not estado.get("terminos_aceptados"):
+        if st.button("✅ Acepto los terminos y politica de privacidad", use_container_width=True, type="primary"):
+            if aceptar_terminos(uid):
+                st.success("Terminos aceptados")
+                st.rerun()
+    else:
+        st.success("✅ Ya aceptaste los terminos")
