@@ -1,6 +1,7 @@
 """
-FlowCredit Digital - Prototipo completo (Parte 1/2)
-Base, funciones y login.
+FlowCredit Digital - Prototipo completo
+Motor de decision crediticia con IA + ciclo completo del credito.
+Proyecto SENA 2026.
 """
 
 import io
@@ -545,6 +546,199 @@ def aceptar_terminos(uid):
         return False
 
 
+# ============ SIMULADOR Y CAPACIDAD ============
+
+def simular_credito(monto, plazo_dias, tasa_anual):
+    return calcular_plan_pagos(monto, tasa_anual, plazo_dias)
+
+
+def calcular_capacidad_pago(ingresos_mensuales):
+    egresos = ingresos_mensuales * 0.6
+    disponible = ingresos_mensuales - egresos
+    capacidad_maxima = disponible * 0.3
+
+    if capacidad_maxima >= 500000:
+        semaforo = "verde"
+        mensaje = "Tienes buena capacidad de pago"
+    elif capacidad_maxima >= 200000:
+        semaforo = "amarillo"
+        mensaje = "Capacidad moderada, considera plazos mas largos"
+    else:
+        semaforo = "rojo"
+        mensaje = "Capacidad limitada, te recomendamos esperar"
+
+    return {
+        "egresos_estimados": round(egresos, 2),
+        "disponible": round(disponible, 2),
+        "capacidad_maxima": round(capacidad_maxima, 2),
+        "semaforo": semaforo,
+        "mensaje": mensaje,
+    }
+
+
+# ============ NOTIFICACIONES ============
+
+def crear_notificacion(uid, titulo, mensaje, tipo="info"):
+    restaurar_sesion()
+    try:
+        supabase_client.table("notificaciones").insert({
+            "user_id": uid,
+            "titulo": titulo,
+            "mensaje": mensaje,
+            "tipo": tipo,
+        }).execute()
+        return True
+    except Exception:
+        return False
+
+
+def obtener_notificaciones(uid, solo_no_leidas=False):
+    restaurar_sesion()
+    try:
+        query = supabase_client.table("notificaciones").select("*").eq("user_id", uid)
+        if solo_no_leidas:
+            query = query.eq("leida", False)
+        r = query.order("created_at", desc=True).limit(50).execute()
+        return r.data or []
+    except Exception:
+        return []
+
+
+def marcar_notificacion_leida(notif_id):
+    restaurar_sesion()
+    try:
+        supabase_client.table("notificaciones").update({
+            "leida": True,
+        }).eq("id", notif_id).execute()
+        return True
+    except Exception:
+        return False
+
+
+def marcar_todas_leidas(uid):
+    restaurar_sesion()
+    try:
+        supabase_client.table("notificaciones").update({
+            "leida": True,
+        }).eq("user_id", uid).eq("leida", False).execute()
+        return True
+    except Exception:
+        return False
+
+
+# ============ CONTRATO PDF ============
+
+def generar_contrato_pdf(cliente, credito, cuotas):
+    try:
+        from fpdf import FPDF
+
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+
+        pdf.set_font("Helvetica", "B", 18)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(0, 12, "FLOWCREDIT DIGITAL", ln=True, align="C")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(100, 116, 139)
+        pdf.cell(0, 5, "Contrato de Microcredito Digital", ln=True, align="C")
+        pdf.ln(5)
+
+        pdf.set_draw_color(16, 185, 129)
+        pdf.set_line_width(0.8)
+        pdf.line(20, pdf.get_y(), 190, pdf.get_y())
+        pdf.ln(8)
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(0, 8, "INFORMACION DEL CLIENTE", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(51, 65, 85)
+
+        if cliente:
+            pdf.cell(0, 6, "Nombre: " + str(cliente.get("nombre_completo", "")), ln=True)
+            pdf.cell(0, 6, "Cedula: " + str(cliente.get("cedula", "")), ln=True)
+            pdf.cell(0, 6, "Ciudad: " + str(cliente.get("ciudad", "")), ln=True)
+            pdf.cell(0, 6, "Ocupacion: " + str(cliente.get("ocupacion", "")), ln=True)
+            ing = int(cliente.get("ingresos_declarados", 0) or 0)
+            pdf.cell(0, 6, "Ingresos declarados: $" + "{:,.0f}".format(ing).replace(",", ".") + " COP", ln=True)
+        pdf.ln(5)
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(0, 8, "CONDICIONES DEL CREDITO", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(51, 65, 85)
+
+        pdf.cell(0, 6, "Monto aprobado: $" + "{:,.0f}".format(credito["monto_aprobado"]).replace(",", ".") + " COP", ln=True)
+        pdf.cell(0, 6, "Tasa anual: " + str(credito["tasa_anual"]) + "%", ln=True)
+        pdf.cell(0, 6, "Plazo: " + str(credito["plazo_dias"]) + " dias", ln=True)
+        pdf.cell(0, 6, "Numero de cuotas: " + str(credito["num_cuotas"]), ln=True)
+        pdf.cell(0, 6, "Valor por cuota: $" + "{:,.0f}".format(credito["valor_cuota"]).replace(",", ".") + " COP", ln=True)
+        pdf.cell(0, 6, "Total intereses: $" + "{:,.0f}".format(credito["total_intereses"]).replace(",", ".") + " COP", ln=True)
+        pdf.cell(0, 6, "Total a pagar: $" + "{:,.0f}".format(credito["total_pagar"]).replace(",", ".") + " COP", ln=True)
+        pdf.ln(5)
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(0, 8, "PLAN DE PAGOS", ln=True)
+
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(30, 41, 59)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(15, 7, "No.", 1, 0, "C", True)
+        pdf.cell(35, 7, "Vencimiento", 1, 0, "C", True)
+        pdf.cell(35, 7, "Valor", 1, 0, "C", True)
+        pdf.cell(35, 7, "Capital", 1, 0, "C", True)
+        pdf.cell(35, 7, "Intereses", 1, 1, "C", True)
+
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(51, 65, 85)
+        for c in cuotas:
+            pdf.cell(15, 6, str(c["numero"]), 1, 0, "C")
+            pdf.cell(35, 6, str(c["fecha_vencimiento"]), 1, 0, "C")
+            pdf.cell(35, 6, "$" + "{:,.0f}".format(c["valor"]).replace(",", "."), 1, 0, "R")
+            pdf.cell(35, 6, "$" + "{:,.0f}".format(c["capital"]).replace(",", "."), 1, 0, "R")
+            pdf.cell(35, 6, "$" + "{:,.0f}".format(c["intereses"]).replace(",", "."), 1, 1, "R")
+
+        pdf.ln(8)
+
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(0, 8, "TERMINOS Y CONDICIONES", ln=True)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(71, 85, 105)
+        terminos = (
+            "El presente contrato se celebra bajo la modalidad de microcredito digital. "
+            "El cliente se compromete a pagar las cuotas en las fechas establecidas. "
+            "El incumplimiento genera intereses de mora segun la legislacion colombiana. "
+            "Este es un documento demostrativo generado por un prototipo academico. "
+            "No representa una obligacion financiera real."
+        )
+        pdf.multi_cell(0, 5, terminos)
+
+        pdf.ln(10)
+        pdf.set_draw_color(15, 23, 42)
+        pdf.line(20, pdf.get_y() + 15, 90, pdf.get_y() + 15)
+        pdf.line(110, pdf.get_y() + 15, 180, pdf.get_y() + 15)
+        pdf.ln(20)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(51, 65, 85)
+        pdf.cell(70, 5, "Firma del Cliente", 0, 0, "C")
+        pdf.cell(70, 5, "FlowCredit Digital", 0, 1, "C")
+
+        pdf.ln(10)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_text_color(148, 163, 184)
+        pdf.cell(0, 5, "Generado el " + datetime.now().strftime("%d/%m/%Y %H:%M"), ln=True, align="C")
+        pdf.cell(0, 5, "FlowCredit Digital - Proyecto SENA 2026", ln=True, align="C")
+
+        return pdf.output(dest="S").encode("latin-1", errors="replace")
+    except Exception as e:
+        st.error("Error generando PDF: " + str(e))
+        return None
+
+
 # ============ ESTADO ============
 
 if "user" not in st.session_state:
@@ -557,6 +751,8 @@ if "onboarding_paso" not in st.session_state:
     st.session_state["onboarding_paso"] = 1
 if "credito_creado" not in st.session_state:
     st.session_state["credito_creado"] = False
+if "onboarding_ok" not in st.session_state:
+    st.session_state["onboarding_ok"] = None
 
 
 # ============ LOGIN ============
@@ -580,6 +776,7 @@ if st.session_state["user"] is None:
                     st.session_state["user"] = {"id": resp.user.id, "email": resp.user.email}
                     st.session_state["access_token"] = resp.session.access_token
                     st.session_state["refresh_token"] = resp.session.refresh_token
+                    st.session_state["onboarding_ok"] = None
                     st.rerun()
             except Exception as e:
                 st.error("Error: " + str(e))
@@ -615,8 +812,11 @@ nombre = email.split("@")[0] if email else "Emprendedor"
 
 # ============ ONBOARDING ============
 
-estado_onb = obtener_estado_onboarding(uid)
-if not estado_onb.get("onboarding_completado"):
+if st.session_state["onboarding_ok"] is None:
+    estado_onb = obtener_estado_onboarding(uid)
+    st.session_state["onboarding_ok"] = estado_onb.get("onboarding_completado", False)
+
+if not st.session_state["onboarding_ok"]:
     st.title("👋 Bienvenido a FlowCredit Digital")
     st.caption("Tu solucion de credito para emprendedores digitales")
     st.divider()
@@ -642,6 +842,7 @@ if not estado_onb.get("onboarding_completado"):
         st.write("3. Recibe el desembolso en menos de 24 horas")
         if st.button("Empezar ahora", use_container_width=True, type="primary"):
             completar_onboarding(uid)
+            st.session_state["onboarding_ok"] = True
             st.session_state["onboarding_paso"] = 1
             st.rerun()
 
@@ -655,14 +856,22 @@ with st.sidebar:
     st.caption(email)
     st.divider()
 
+    no_leidas = len(obtener_notificaciones(uid, solo_no_leidas=True))
+    etiqueta_notif = "🔔 Notificaciones"
+    if no_leidas > 0:
+        etiqueta_notif = "🔔 Notificaciones (" + str(no_leidas) + ")"
+
     menu = st.radio(
         "Menu",
         [
             "📊 Dashboard",
+            "🧮 Simulador",
             "🛡️ Verificacion",
             "💳 Solicitar credito",
             "💼 Mis creditos",
+            "📄 Contrato",
             "📋 Historial",
+            etiqueta_notif,
             "📜 Terminos",
         ],
         label_visibility="collapsed",
@@ -674,11 +883,9 @@ with st.sidebar:
             supabase_client.auth.sign_out()
         except Exception:
             pass
-        for k in ["user", "access_token", "refresh_token", "resultado_actual", "datos_actuales", "credito_creado"]:
+        for k in ["user", "access_token", "refresh_token", "resultado_actual", "datos_actuales", "credito_creado", "onboarding_ok"]:
             st.session_state.pop(k, None)
         st.rerun()
-
-# ⬇️ AQUI CONTINUA LA PARTE 2 ⬇️
 
 
 # ============ DASHBOARD ============
@@ -735,6 +942,94 @@ if menu == "📊 Dashboard":
         st.success("🔵 PayPal - Conectado")
     with col_d:
         st.warning("🟢 Daviplata - Pendiente")
+
+
+# ============ SIMULADOR ============
+
+elif menu == "🧮 Simulador":
+    st.title("🧮 Simulador de credito")
+    st.caption("Calcula tu cuota antes de solicitarla")
+
+    cliente = obtener_cliente_demo(email)
+    ingresos_base = int(cliente["ingresos_declarados"]) if cliente else 3000000
+
+    st.subheader("⚙️ Configura tu credito")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        monto_sim = st.slider(
+            "Monto (COP)",
+            min_value=100000, max_value=5000000,
+            value=1000000, step=100000,
+        )
+    with col2:
+        plazo_sim = st.select_slider(
+            "Plazo (dias)",
+            options=[30, 60, 90, 120, 180],
+            value=90,
+        )
+
+    if cliente:
+        score = cliente["score_datacredito"]
+        if score >= 800:
+            tasa_est = 10.0
+        elif score >= 700:
+            tasa_est = 13.0
+        elif score >= 600:
+            tasa_est = 16.0
+        else:
+            tasa_est = 19.0
+    else:
+        tasa_est = 16.0
+
+    st.info("📊 Tasa estimada segun tu perfil: **" + str(tasa_est) + "% anual**")
+
+    plan = simular_credito(monto_sim, plazo_sim, tasa_est)
+
+    st.divider()
+    st.subheader("💰 Resultado de la simulacion")
+
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.metric("Cuotas", plan["num_cuotas"])
+    with col_b:
+        st.metric("Valor por cuota", "$" + "{:,.0f}".format(plan["valor_cuota"]).replace(",", "."))
+    with col_c:
+        st.metric("Total a pagar", "$" + "{:,.0f}".format(plan["total_pagar"]).replace(",", "."))
+
+    col_d, col_e = st.columns(2)
+    with col_d:
+        st.metric("Total intereses", "$" + "{:,.0f}".format(plan["total_intereses"]).replace(",", "."))
+    with col_e:
+        porcentaje_ingresos = (plan["valor_cuota"] / ingresos_base * 100) if ingresos_base > 0 else 0
+        st.metric("Cuota / Ingresos", "{:.1f}%".format(porcentaje_ingresos))
+
+    if porcentaje_ingresos > 30:
+        st.warning("⚠️ La cuota supera el 30% de tus ingresos. Considera un plazo mas largo o un monto menor.")
+    else:
+        st.success("✅ La cuota esta dentro de tu capacidad de pago")
+
+    st.divider()
+    st.subheader("📊 Calculadora de capacidad de pago")
+    cap = calcular_capacidad_pago(ingresos_base)
+
+    col_f, col_g, col_h = st.columns(3)
+    with col_f:
+        st.metric("Ingresos mensuales", "$" + "{:,.0f}".format(ingresos_base).replace(",", "."))
+    with col_g:
+        st.metric("Egresos estimados", "$" + "{:,.0f}".format(int(cap["egresos_estimados"])).replace(",", "."))
+    with col_h:
+        st.metric("Capacidad maxima", "$" + "{:,.0f}".format(int(cap["capacidad_maxima"])).replace(",", "."))
+
+    if cap["semaforo"] == "verde":
+        st.success("🟢 " + cap["mensaje"])
+    elif cap["semaforo"] == "amarillo":
+        st.warning("🟡 " + cap["mensaje"])
+    else:
+        st.error("🔴 " + cap["mensaje"])
+
+    st.divider()
+    st.info("💡 Ve al menu lateral y toca 'Solicitar credito' para aplicar con estos valores")
 
 
 # ============ VERIFICACION ============
@@ -914,6 +1209,13 @@ elif menu == "💳 Solicitar credito":
                 )
                 if credito_id:
                     st.session_state["credito_creado"] = True
+                    monto_str = "{:,.0f}".format(resultado["monto_aprobado"]).replace(",", ".")
+                    crear_notificacion(
+                        uid,
+                        "🎉 Credito aprobado",
+                        "Tu credito por $" + monto_str + " fue aprobado y desembolsado. Ya puedes ver el plan de pagos.",
+                        "success",
+                    )
                     st.info("💼 Tu credito fue registrado. Ve a 'Mis creditos' para ver el plan de pagos.")
 
         st.divider()
@@ -1022,6 +1324,13 @@ elif menu == "💼 Mis creditos":
                 )
                 if st.button("💳 Pagar cuota " + str(siguiente["numero"]), key="pagar_" + str(cred["id"])):
                     if pagar_cuota(siguiente["id"], cred["id"]):
+                        valor_str = "{:,.0f}".format(siguiente["valor"]).replace(",", ".")
+                        crear_notificacion(
+                            uid,
+                            "✅ Pago recibido",
+                            "Registramos el pago de tu cuota " + str(siguiente["numero"]) + " por $" + valor_str,
+                            "success",
+                        )
                         st.success("✅ Cuota pagada correctamente")
                         st.balloons()
                         st.rerun()
@@ -1029,6 +1338,49 @@ elif menu == "💼 Mis creditos":
                         st.error("No se pudo procesar el pago")
             else:
                 st.success("🎉 Credito pagado completamente")
+
+            st.divider()
+
+
+# ============ CONTRATO ============
+
+elif menu == "📄 Contrato":
+    st.title("📄 Contratos de credito")
+    st.caption("Descarga los contratos de tus creditos aprobados")
+
+    creditos = obtener_todos_creditos(uid)
+
+    if not creditos:
+        st.info("No tienes creditos para generar contrato.")
+    else:
+        cliente = obtener_cliente_demo(email)
+
+        for cred in creditos:
+            st.subheader("Contrato Credito #" + str(cred["id"]))
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Monto", "$" + "{:,.0f}".format(cred["monto_aprobado"]).replace(",", "."))
+            with col2:
+                st.metric("Tasa", str(cred["tasa_anual"]) + "%")
+            with col3:
+                st.metric("Cuotas", str(cred["num_cuotas"]))
+
+            cuotas = obtener_cuotas(cred["id"])
+
+            if st.button("📥 Generar contrato PDF", key="pdf_" + str(cred["id"]), type="primary"):
+                with st.spinner("Generando PDF..."):
+                    pdf_bytes = generar_contrato_pdf(cliente, cred, cuotas)
+                if pdf_bytes:
+                    st.download_button(
+                        "⬇️ Descargar contrato " + str(cred["id"]) + ".pdf",
+                        data=pdf_bytes,
+                        file_name="contrato_flowcredit_" + str(cred["id"]) + ".pdf",
+                        mime="application/pdf",
+                        key="dl_" + str(cred["id"]),
+                    )
+                else:
+                    st.error("No se pudo generar el PDF")
 
             st.divider()
 
@@ -1055,6 +1407,44 @@ elif menu == "📋 Historial":
                 "Tasa": str(s.get("tasa_sugerida", 0)) + "%",
             })
         st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
+
+
+# ============ NOTIFICACIONES ============
+
+elif menu.startswith("🔔"):
+    st.title("🔔 Notificaciones")
+    st.caption("Todas las alertas de tu cuenta")
+
+    notifs = obtener_notificaciones(uid)
+
+    if not notifs:
+        st.info("No tienes notificaciones.")
+    else:
+        no_leidas = sum(1 for n in notifs if not n.get("leida"))
+        if no_leidas > 0:
+            st.warning("Tienes " + str(no_leidas) + " notificaciones sin leer")
+            if st.button("✅ Marcar todas como leidas", use_container_width=True):
+                marcar_todas_leidas(uid)
+                st.rerun()
+
+        st.divider()
+
+        for n in notifs:
+            icono = "📬" if not n.get("leida") else "📭"
+
+            col_a, col_b = st.columns([5, 1])
+            with col_a:
+                titulo_estilo = "**" + n["titulo"] + "**" if not n.get("leida") else n["titulo"]
+                st.markdown(icono + " " + titulo_estilo)
+                st.caption(n["mensaje"])
+                fecha = (n.get("created_at") or "")[:16].replace("T", " ")
+                st.caption("🕒 " + fecha)
+            with col_b:
+                if not n.get("leida"):
+                    if st.button("✓", key="leer_" + str(n["id"])):
+                        marcar_notificacion_leida(n["id"])
+                        st.rerun()
+            st.divider()
 
 
 # ============ TERMINOS ============
