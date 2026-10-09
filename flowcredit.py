@@ -733,7 +733,10 @@ def generar_contrato_pdf(cliente, credito, cuotas):
         pdf.cell(0, 5, "Generado el " + datetime.now().strftime("%d/%m/%Y %H:%M"), ln=True, align="C")
         pdf.cell(0, 5, "FlowCredit Digital - Proyecto SENA 2026", ln=True, align="C")
 
-        return pdf.output(dest="S").encode("latin-1", errors="replace")
+        resultado = pdf.output()
+        if isinstance(resultado, str):
+            return resultado.encode("latin-1", errors="replace")
+        return bytes(resultado)
     except Exception as e:
         st.error("Error generando PDF: " + str(e))
         return None
