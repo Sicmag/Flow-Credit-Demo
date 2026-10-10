@@ -282,6 +282,35 @@ def obtener_cliente_demo(email):
         return None
 
 
+# ============ BD: DATOS PERSONALES ============
+
+def guardar_datos_personales(uid, nombres, apellidos, cedula, telefono):
+    """Guarda los datos personales del usuario en profiles."""
+    restaurar_sesion()
+    try:
+        supabase_client.table("profiles").update({
+            "nombres": nombres,
+            "apellidos": apellidos,
+            "cedula": cedula,
+            "telefono": telefono,
+        }).eq("id", uid).execute()
+        return True
+    except Exception:
+        return False
+
+
+def obtener_datos_personales(uid):
+    """Obtiene los datos personales del usuario desde profiles."""
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("profiles") \
+            .select("nombres, apellidos, cedula, telefono") \
+            .eq("id", uid).execute()
+        return r.data[0] if r.data else None
+    except Exception:
+        return None
+
+
 # ============ BD: CODIGO RECUPERACION ============
 
 def generar_codigo_recuperacion():
@@ -628,7 +657,7 @@ def marcar_todas_leidas(uid):
 
 # ============ CONTRATO PDF ============
 
-def generar_contrato_pdf(cliente, credito, cuotas):
+def generar_contrato_pdf(cliente, credito, cuotas, datos_personales=None):
     try:
         from fpdf import FPDF
 
@@ -655,13 +684,33 @@ def generar_contrato_pdf(cliente, credito, cuotas):
         pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(51, 65, 85)
 
+        # Datos personales reales del usuario
+        nombres_c = str((datos_personales or {}).get("nombres", "") or "")
+        apellidos_c = str((datos_personales or {}).get("apellidos", "") or "")
+        cedula_c = str((datos_personales or {}).get("cedula", "") or "")
+        telefono_c = str((datos_personales or {}).get("telefono", "") or "")
+
+        # Si no hay datos del usuario registrado, usar cliente demo
         if cliente:
-            pdf.cell(0, 6, "Nombre: " + str(cliente.get("nombre_completo", "")), ln=True)
-            pdf.cell(0, 6, "Cedula: " + str(cliente.get("cedula", "")), ln=True)
+            if not nombres_c:
+                nombres_c = str(cliente.get("nombre_completo", "") or "")
+            if not cedula_c:
+                cedula_c = str(cliente.get("cedula", "") or "")
+            if not telefono_c:
+                telefono_c = str(cliente.get("telefono", "") or "")
+
+        nombre_completo = (nombres_c + " " + apellidos_c).strip()
+
+        pdf.cell(0, 6, "Nombre: " + nombre_completo, ln=True)
+        pdf.cell(0, 6, "Cedula: " + cedula_c, ln=True)
+        pdf.cell(0, 6, "Telefono: " + telefono_c, ln=True)
+
+        if cliente:
             pdf.cell(0, 6, "Ciudad: " + str(cliente.get("ciudad", "")), ln=True)
             pdf.cell(0, 6, "Ocupacion: " + str(cliente.get("ocupacion", "")), ln=True)
             ing = int(cliente.get("ingresos_declarados", 0) or 0)
             pdf.cell(0, 6, "Ingresos declarados: $" + "{:,.0f}".format(ing).replace(",", ".") + " COP", ln=True)
+
         pdf.ln(5)
 
         pdf.set_font("Helvetica", "B", 12)
@@ -1055,6 +1104,25 @@ if st.session_state["user"] is None:
                     st.session_state["access_token"] = resp.session.access_token
                     st.session_state["refresh_token"] = resp.session.refresh_token
                     st.session_state["onboarding_ok"] = None
+
+                    try:
+                        meta = resp.user.user_metadata or {}
+                        nombres_meta = meta.get("nombres", "")
+                        apellidos_meta = meta.get("apellidos", "")
+                        cedula_meta = meta.get("cedula", "")
+                        telefono_meta = meta.get("telefono", "")
+
+                        if nombres_meta or apellidos_meta:
+                            guardar_datos_personales(
+                                resp.user.id,
+                                nombres_meta,
+                                apellidos_meta,
+                                cedula_meta,
+                                telefono_meta,
+                            )
+                    except Exception:
+                        pass
+
                     st.rerun()
             except Exception as e:
                 st.error("Error: " + str(e))
@@ -1062,18 +1130,49 @@ if st.session_state["user"] is None:
     with tab2:
         st.caption("Minimo 8 caracteres con mayuscula, minuscula, numero y un simbolo.")
         with st.form("registro"):
+            col_n1, col_n2 = st.columns(2)
+            with col_n1:
+                nombres_r = st.text_input("Nombres", key="r_nombres")
+            with col_n2:
+                apellidos_r = st.text_input("Apellidos", key="r_apellidos")
+
+            col_c1, col_c2 = st.columns(2)
+            with col_c1:
+                cedula_r = st.text_input("Cedula", key="r_cedula", max_chars=15)
+            with col_c2:
+                telefono_r = st.text_input("Telefono", key="r_telefono", max_chars=15)
+
             email_r = st.text_input("Correo", key="r_email")
             pwd_r = st.text_input("Contrasena", type="password", key="r_pwd")
             pwd_r2 = st.text_input("Repite contrasena", type="password", key="r_pwd2")
+
             ok_r = st.form_submit_button("Crear cuenta", use_container_width=True)
+
         if ok_r:
-            if pwd_r != pwd_r2:
+            if not nombres_r or not apellidos_r:
+                st.error("Debes escribir nombres y apellidos.")
+            elif not cedula_r or not telefono_r:
+                st.error("Debes escribir cedula y telefono.")
+            elif not email_r:
+                st.error("Debes escribir un correo.")
+            elif pwd_r != pwd_r2:
                 st.error("Las contrasenas no coinciden.")
             elif len(pwd_r) < 8:
                 st.error("Minimo 8 caracteres.")
             else:
                 try:
-                    supabase_client.auth.sign_up({"email": email_r, "password": pwd_r})
+                    resp = supabase_client.auth.sign_up({
+                        "email": email_r,
+                        "password": pwd_r,
+                        "options": {
+                            "data": {
+                                "nombres": nombres_r,
+                                "apellidos": apellidos_r,
+                                "cedula": cedula_r,
+                                "telefono": telefono_r,
+                            }
+                        }
+                    })
                     st.success("Cuenta creada. Revisa tu correo para confirmar.")
                 except Exception as e:
                     st.error("Error: " + str(e))
@@ -1085,6 +1184,14 @@ if st.session_state["user"] is None:
 uid = st.session_state["user"]["id"]
 email = st.session_state["user"]["email"]
 nombre = email.split("@")[0] if email else "Emprendedor"
+
+# Datos personales del usuario
+datos_personales = obtener_datos_personales(uid) or {}
+nombre_real = (
+    (datos_personales.get("nombres", "") or "") + " " +
+    (datos_personales.get("apellidos", "") or "")
+).strip()
+nombre_display = nombre_real if nombre_real else nombre
 
 
 # ============ ONBOARDING ============
@@ -1128,7 +1235,7 @@ if not st.session_state["onboarding_ok"]:
 # ============ SIDEBAR ============
 
 with st.sidebar:
-    st.markdown("### 👤 " + nombre)
+    st.markdown("### 👤 " + nombre_display)
     st.caption(email)
 
     saldo_actual = obtener_saldo(uid)
@@ -1387,7 +1494,7 @@ elif menu == "💳 FlowCard":
             '</div>'
             '<div style="font-size:22px;letter-spacing:3px;font-family:monospace;margin-bottom:32px;">' + tarjeta["numero"] + '</div>'
             '<div style="display:flex;justify-content:space-between;font-size:12px;">'
-            '<div><div style="opacity:0.6;margin-bottom:4px;">TITULAR</div><div style="font-weight:700;">' + nombre.upper() + '</div></div>'
+            '<div><div style="opacity:0.6;margin-bottom:4px;">TITULAR</div><div style="font-weight:700;">' + nombre_display.upper() + '</div></div>'
             '<div><div style="opacity:0.6;margin-bottom:4px;">VENCE</div><div style="font-weight:700;">' + str(tarjeta.get("fecha_expiracion", "")) + '</div></div>'
             '<div><div style="opacity:0.6;margin-bottom:4px;">CVV</div><div style="font-weight:700;">' + str(tarjeta.get("cvv", "")) + '</div></div>'
             '</div>'
@@ -1829,6 +1936,8 @@ elif menu == "💳 Solicitar credito":
     cliente = obtener_cliente_demo(email)
     if cliente:
         st.success("✅ " + cliente["nombre_completo"] + " | " + cliente["cedula"] + " | Score " + str(cliente["score_datacredito"]))
+    elif nombre_real:
+        st.success("✅ " + nombre_real + " | " + str(datos_personales.get("cedula", "")))
 
     if st.session_state["resultado_actual"] is None:
         ingresos_default = int(cliente["ingresos_declarados"]) if cliente else 3000000
@@ -2004,7 +2113,7 @@ elif menu == "📄 Contrato":
 
             if st.button("📥 Generar contrato PDF", key="pdf_" + str(cred["id"]), type="primary"):
                 with st.spinner("Generando..."):
-                    pdf_bytes = generar_contrato_pdf(cliente, cred, cuotas)
+                    pdf_bytes = generar_contrato_pdf(cliente, cred, cuotas, datos_personales)
                 if pdf_bytes:
                     st.download_button(
                         "⬇️ Descargar contrato",
