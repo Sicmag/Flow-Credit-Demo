@@ -792,14 +792,25 @@ def obtener_transferencias(uid):
         return []
 
 
-def emails_demo():
-    return [
-        "carlosandres3341@gmail.com",
-        "jesusviloria@gmail.com",
-        "juan@test.com",
-        "maria@test.com",
-        "ana@test.com",
-    ]
+def obtener_usuarios_registrados():
+    """Trae todos los usuarios con cuenta creada en la plataforma."""
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("usuarios_registrados").select("*").execute()
+        return r.data or []
+    except Exception:
+        return []
+
+
+def obtener_email_por_user_id(user_id):
+    restaurar_sesion()
+    try:
+        r = supabase_client.rpc("obtener_email_usuario", {"p_user_id": user_id}).execute()
+        if r.data:
+            return r.data
+    except Exception:
+        pass
+    return None
 
 
 # ============ ESTADO ============
@@ -846,7 +857,6 @@ if st.session_state["user"] is None:
 
     with tab2:
         st.caption("Minimo 8 caracteres con mayuscula, minuscula, numero y un simbolo.")
-        st.info("Correos demo: carlosandres3341@gmail.com | jesusviloria@gmail.com | juan@test.com")
         with st.form("registro"):
             email_r = st.text_input("Correo", key="r_email")
             pwd_r = st.text_input("Contrasena", type="password", key="r_pwd")
@@ -1016,7 +1026,7 @@ if menu == "📊 Dashboard":
 
 elif menu == "💸 FlowPay":
     st.title("💸 FlowPay")
-    st.caption("Transferencias digitales instantaneas entre usuarios")
+    st.caption("Transferencias digitales instantaneas entre usuarios registrados")
 
     cuenta = obtener_cuenta(uid)
     saldo = float(cuenta["saldo"]) if cuenta else 0
@@ -1040,11 +1050,26 @@ elif menu == "💸 FlowPay":
         else:
             st.subheader("Nueva transferencia")
 
+            usuarios_reg = obtener_usuarios_registrados()
+            otros = [u for u in usuarios_reg if u.get("user_id") != uid and u.get("email")]
+            opciones_emails = [u["email"] for u in otros]
+
             with st.form("form_transferir"):
-                receptor = st.selectbox(
-                    "Destinatario (correo)",
-                    [e for e in emails_demo() if e != email],
+                modo = st.radio(
+                    "Como quieres elegir al destinatario",
+                    ["Elegir de la lista", "Escribir correo"],
+                    horizontal=True,
                 )
+
+                if modo == "Elegir de la lista":
+                    if not opciones_emails:
+                        st.warning("Aun no hay otros usuarios registrados en la plataforma.")
+                        receptor = None
+                    else:
+                        receptor = st.selectbox("Destinatario", opciones_emails)
+                else:
+                    receptor = st.text_input("Correo del destinatario")
+
                 monto = st.number_input(
                     "Monto a transferir (COP)",
                     min_value=1000,
@@ -1057,24 +1082,29 @@ elif menu == "💸 FlowPay":
                 enviar = st.form_submit_button("📤 Transferir", use_container_width=True, type="primary")
 
             if enviar:
-                with st.spinner("Procesando transferencia..."):
-                    resultado = transferir(receptor, monto, concepto or "Sin concepto")
-
-                if resultado and resultado.get("success"):
-                    monto_fmt = "{:,.0f}".format(monto).replace(",", ".")
-                    st.success("✅ Transferencia exitosa")
-                    st.info("Enviaste $" + monto_fmt + " a " + receptor)
-                    crear_notificacion(
-                        uid,
-                        "💸 Transferencia enviada",
-                        "Enviaste $" + monto_fmt + " a " + receptor,
-                        "success",
-                    )
-                    st.balloons()
-                    st.rerun()
+                if not receptor:
+                    st.error("Debes seleccionar o escribir un destinatario.")
+                elif receptor.strip().lower() == email.lower():
+                    st.error("No puedes transferirte a ti mismo.")
                 else:
-                    msg = resultado.get("message", "Error desconocido") if resultado else "Error"
-                    st.error("❌ " + msg)
+                    with st.spinner("Procesando transferencia..."):
+                        resultado = transferir(receptor.strip().lower(), monto, concepto or "Sin concepto")
+
+                    if resultado and resultado.get("success"):
+                        monto_fmt = "{:,.0f}".format(monto).replace(",", ".")
+                        st.success("✅ Transferencia exitosa")
+                        st.info("Enviaste $" + monto_fmt + " a " + receptor)
+                        crear_notificacion(
+                            uid,
+                            "💸 Transferencia enviada",
+                            "Enviaste $" + monto_fmt + " a " + receptor,
+                            "success",
+                        )
+                        st.balloons()
+                        st.rerun()
+                    else:
+                        msg = resultado.get("message", "Error desconocido") if resultado else "Error"
+                        st.error("❌ " + msg)
 
     with tab_historial:
         st.subheader("Movimientos recientes")
@@ -1196,12 +1226,7 @@ elif menu == "🛡️ Verificacion":
 
     if not cliente:
         st.warning("No se encontraron datos verificados para tu correo.")
-        st.info("Correos demo disponibles:")
-        st.code("carlosandres3341@gmail.com")
-        st.code("jesusviloria@gmail.com")
-        st.code("juan@test.com")
-        st.code("maria@test.com")
-        st.code("ana@test.com")
+        st.info("Esta es una cuenta registrada sin perfil demo precargado. Puedes continuar con la verificacion biometrica.")
     else:
         st.success("✅ Identidad Verificada - Datos consultados en bases oficiales")
         st.divider()
@@ -1218,48 +1243,48 @@ elif menu == "🛡️ Verificacion":
             st.metric("Ocupacion", cliente["ocupacion"])
             st.metric("Score Datacredito", cliente["score_datacredito"])
 
-        st.divider()
-        st.subheader("🔐 Verificacion biometrica con reconocimiento facial")
-        st.info("Toma una foto de tu rostro de frente, con buena luz.")
+    st.divider()
+    st.subheader("🔐 Verificacion biometrica con reconocimiento facial")
+    st.info("Toma una foto de tu rostro de frente, con buena luz.")
 
-        foto = st.camera_input("📸 Toma una foto de tu rostro")
+    foto = st.camera_input("📸 Toma una foto de tu rostro")
 
-        if foto is not None:
-            imagen_bytes = foto.getvalue()
-            with st.spinner("Analizando rostro..."):
-                tiene_rostro, cantidad = detectar_rostro(imagen_bytes)
+    if foto is not None:
+        imagen_bytes = foto.getvalue()
+        with st.spinner("Analizando rostro..."):
+            tiene_rostro, cantidad = detectar_rostro(imagen_bytes)
 
-            if not tiene_rostro:
-                st.error("❌ No se reconoce un rostro. Intenta con mejor luz y rostro de frente.")
-            else:
-                st.success("✅ Rostro detectado (" + str(cantidad) + " rostro(s))")
-                with st.spinner("Guardando verificacion..."):
-                    url = subir_foto_verificacion(uid, imagen_bytes)
-                    if url:
-                        guardar_verificacion(uid, url, "verificado")
-                        st.success("🎉 Identidad verificada correctamente")
-                        st.balloons()
-                    else:
-                        st.warning("Rostro detectado, pero no se pudo guardar la foto.")
-
-        st.divider()
-        st.subheader("🔑 Codigo de recuperacion")
-        st.caption("Sistema de recuperacion basado en claves criptograficas.")
-
-        codigo_info = obtener_codigo_recuperacion(uid)
-        if codigo_info and codigo_info.get("recovery_code"):
-            st.warning("⚠️ Guarda este codigo en un lugar seguro.")
-            st.code(codigo_info["recovery_code"], language=None)
+        if not tiene_rostro:
+            st.error("❌ No se reconoce un rostro. Intenta con mejor luz y rostro de frente.")
         else:
-            st.info("Aun no has generado tu codigo de recuperacion.")
-            if st.button("🔐 Generar codigo de recuperacion", use_container_width=True, type="primary"):
-                with st.spinner("Generando..."):
-                    codigo = guardar_codigo_recuperacion(uid)
-                if codigo:
-                    st.success("✅ Codigo generado")
-                    st.rerun()
+            st.success("✅ Rostro detectado (" + str(cantidad) + " rostro(s))")
+            with st.spinner("Guardando verificacion..."):
+                url = subir_foto_verificacion(uid, imagen_bytes)
+                if url:
+                    guardar_verificacion(uid, url, "verificado")
+                    st.success("🎉 Identidad verificada correctamente")
+                    st.balloons()
                 else:
-                    st.error("No se pudo generar el codigo.")
+                    st.warning("Rostro detectado, pero no se pudo guardar la foto.")
+
+    st.divider()
+    st.subheader("🔑 Codigo de recuperacion")
+    st.caption("Sistema de recuperacion basado en claves criptograficas.")
+
+    codigo_info = obtener_codigo_recuperacion(uid)
+    if codigo_info and codigo_info.get("recovery_code"):
+        st.warning("⚠️ Guarda este codigo en un lugar seguro.")
+        st.code(codigo_info["recovery_code"], language=None)
+    else:
+        st.info("Aun no has generado tu codigo de recuperacion.")
+        if st.button("🔐 Generar codigo de recuperacion", use_container_width=True, type="primary"):
+            with st.spinner("Generando..."):
+                codigo = guardar_codigo_recuperacion(uid)
+            if codigo:
+                st.success("✅ Codigo generado")
+                st.rerun()
+            else:
+                st.error("No se pudo generar el codigo.")
 
 
 # ============ SOLICITAR CREDITO ============
@@ -1272,7 +1297,7 @@ elif menu == "💳 Solicitar credito":
     if cliente:
         st.success("✅ Cliente verificado: " + cliente["nombre_completo"] + " | Cedula " + cliente["cedula"] + " | Score " + str(cliente["score_datacredito"]))
     else:
-        st.warning("⚠️ No tienes verificacion previa.")
+        st.warning("⚠️ No tienes perfil demo precargado. Puedes continuar con la solicitud.")
 
     if st.session_state["resultado_actual"] is None:
         ingresos_default = int(cliente["ingresos_declarados"]) if cliente else 3000000
