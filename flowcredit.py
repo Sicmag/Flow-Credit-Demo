@@ -1,6 +1,6 @@
 """
 FlowCredit Digital - Prototipo completo
-Motor de decision crediticia con IA + ciclo completo del credito.
+Fintech para emprendedores digitales.
 Proyecto SENA 2026.
 """
 
@@ -742,6 +742,66 @@ def generar_contrato_pdf(cliente, credito, cuotas):
         return None
 
 
+# ============ CUENTAS Y TRANSFERENCIAS ============
+
+def obtener_cuenta(uid):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("cuentas").select("*").eq("user_id", uid).execute()
+        if r.data:
+            return r.data[0]
+        numero = "FC-" + str(uid)[:8]
+        resp = supabase_client.table("cuentas").insert({
+            "user_id": uid,
+            "numero_cuenta": numero,
+            "saldo": 1000000,
+        }).execute()
+        return resp.data[0] if resp.data else None
+    except Exception:
+        return None
+
+
+def obtener_saldo(uid):
+    cuenta = obtener_cuenta(uid)
+    if cuenta:
+        return float(cuenta.get("saldo", 0))
+    return 0
+
+
+def transferir(receptor_email, monto, concepto):
+    restaurar_sesion()
+    try:
+        resp = supabase_client.rpc("transferir_dinero", {
+            "p_receptor_email": receptor_email,
+            "p_monto": float(monto),
+            "p_concepto": concepto,
+        }).execute()
+        return resp.data
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+def obtener_transferencias(uid):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("transferencias").select("*").or_(
+            "emisor_id.eq." + str(uid) + ",receptor_id.eq." + str(uid)
+        ).order("created_at", desc=True).limit(50).execute()
+        return r.data or []
+    except Exception:
+        return []
+
+
+def emails_demo():
+    return [
+        "carlosandres3341@gmail.com",
+        "jesusviloria@gmail.com",
+        "juan@test.com",
+        "maria@test.com",
+        "ana@test.com",
+    ]
+
+
 # ============ ESTADO ============
 
 if "user" not in st.session_state:
@@ -857,6 +917,9 @@ if not st.session_state["onboarding_ok"]:
 with st.sidebar:
     st.markdown("### 👤 " + nombre)
     st.caption(email)
+
+    saldo_actual = obtener_saldo(uid)
+    st.markdown("**Saldo:** $" + "{:,.0f}".format(saldo_actual).replace(",", "."))
     st.divider()
 
     no_leidas = len(obtener_notificaciones(uid, solo_no_leidas=True))
@@ -868,6 +931,7 @@ with st.sidebar:
         "Menu",
         [
             "📊 Dashboard",
+            "💸 FlowPay",
             "🧮 Simulador",
             "🛡️ Verificacion",
             "💳 Solicitar credito",
@@ -895,10 +959,11 @@ with st.sidebar:
 
 if menu == "📊 Dashboard":
     st.title("📊 Dashboard")
-    st.caption("Vista general de tu linea de credito digital")
+    st.caption("Vista general de tu ecosistema financiero")
 
     solicitudes = obtener_solicitudes(uid)
     creditos = obtener_creditos_activos(uid)
+    saldo = obtener_saldo(uid)
 
     linea_disponible = 2500000
     score_actual = 742
@@ -910,13 +975,13 @@ if menu == "📊 Dashboard":
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Linea disponible", "$" + "{:,.0f}".format(linea_disponible).replace(",", "."))
+        st.metric("Saldo disponible", "$" + "{:,.0f}".format(saldo).replace(",", "."))
     with col2:
         st.metric("Score crediticio", str(score_actual) + "/1000")
     with col3:
-        st.metric("Solicitudes", len(solicitudes))
-    with col4:
         st.metric("Creditos activos", len(creditos))
+    with col4:
+        st.metric("Solicitudes", len(solicitudes))
 
     st.divider()
     st.subheader("📈 Flujo de caja ultimos 12 meses")
@@ -945,6 +1010,92 @@ if menu == "📊 Dashboard":
         st.success("🔵 PayPal - Conectado")
     with col_d:
         st.warning("🟢 Daviplata - Pendiente")
+
+
+# ============ FLOWPAY ============
+
+elif menu == "💸 FlowPay":
+    st.title("💸 FlowPay")
+    st.caption("Transferencias digitales instantaneas entre usuarios")
+
+    cuenta = obtener_cuenta(uid)
+    saldo = float(cuenta["saldo"]) if cuenta else 0
+
+    st.markdown("#### Tu cuenta")
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.metric("Numero de cuenta", cuenta["numero_cuenta"] if cuenta else "N/A")
+    with col_b:
+        st.metric("Saldo disponible", "$" + "{:,.0f}".format(saldo).replace(",", "."))
+    with col_c:
+        st.metric("Estado", "🟢 Activa")
+
+    st.divider()
+
+    tab_enviar, tab_historial = st.tabs(["📤 Enviar dinero", "📥 Historial"])
+
+    with tab_enviar:
+        if saldo <= 0:
+            st.warning("No tienes saldo disponible para transferir.")
+        else:
+            st.subheader("Nueva transferencia")
+
+            with st.form("form_transferir"):
+                receptor = st.selectbox(
+                    "Destinatario (correo)",
+                    [e for e in emails_demo() if e != email],
+                )
+                monto = st.number_input(
+                    "Monto a transferir (COP)",
+                    min_value=1000,
+                    max_value=int(saldo),
+                    value=min(100000, int(saldo)),
+                    step=1000,
+                )
+                concepto = st.text_input("Concepto (opcional)", max_chars=80)
+
+                enviar = st.form_submit_button("📤 Transferir", use_container_width=True, type="primary")
+
+            if enviar:
+                with st.spinner("Procesando transferencia..."):
+                    resultado = transferir(receptor, monto, concepto or "Sin concepto")
+
+                if resultado and resultado.get("success"):
+                    monto_fmt = "{:,.0f}".format(monto).replace(",", ".")
+                    st.success("✅ Transferencia exitosa")
+                    st.info("Enviaste $" + monto_fmt + " a " + receptor)
+                    crear_notificacion(
+                        uid,
+                        "💸 Transferencia enviada",
+                        "Enviaste $" + monto_fmt + " a " + receptor,
+                        "success",
+                    )
+                    st.balloons()
+                    st.rerun()
+                else:
+                    msg = resultado.get("message", "Error desconocido") if resultado else "Error"
+                    st.error("❌ " + msg)
+
+    with tab_historial:
+        st.subheader("Movimientos recientes")
+        transferencias = obtener_transferencias(uid)
+
+        if not transferencias:
+            st.info("Aun no has realizado transferencias.")
+        else:
+            filas = []
+            for t in transferencias:
+                es_emisor = t["emisor_id"] == uid
+                monto_fmt = "{:,.0f}".format(t["monto"]).replace(",", ".")
+                prefijo = "-$" if es_emisor else "+$"
+                filas.append({
+                    "Fecha": (t.get("created_at") or "")[:16].replace("T", " "),
+                    "Tipo": "Enviado" if es_emisor else "Recibido",
+                    "Contraparte": t["receptor_email"] if es_emisor else t["emisor_email"],
+                    "Monto": prefijo + monto_fmt,
+                    "Concepto": t.get("concepto", ""),
+                })
+            st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
 
 
 # ============ SIMULADOR ============
@@ -1216,7 +1367,7 @@ elif menu == "💳 Solicitar credito":
                     crear_notificacion(
                         uid,
                         "🎉 Credito aprobado",
-                        "Tu credito por $" + monto_str + " fue aprobado y desembolsado. Ya puedes ver el plan de pagos.",
+                        "Tu credito por $" + monto_str + " fue aprobado y desembolsado.",
                         "success",
                     )
                     st.info("💼 Tu credito fue registrado. Ve a 'Mis creditos' para ver el plan de pagos.")
