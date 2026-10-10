@@ -1,5 +1,5 @@
 """
-FlowCredit Digital - Prototipo completo
+FlowCredit Digital - Banco digital completo
 Fintech para emprendedores digitales.
 Proyecto SENA 2026.
 """
@@ -793,7 +793,6 @@ def obtener_transferencias(uid):
 
 
 def obtener_usuarios_registrados():
-    """Trae todos los usuarios con cuenta creada en la plataforma."""
     restaurar_sesion()
     try:
         r = supabase_client.table("usuarios_registrados").select("*").execute()
@@ -802,15 +801,220 @@ def obtener_usuarios_registrados():
         return []
 
 
-def obtener_email_por_user_id(user_id):
+# ============ FLOWCARD ============
+
+def obtener_tarjeta(uid):
     restaurar_sesion()
     try:
-        r = supabase_client.rpc("obtener_email_usuario", {"p_user_id": user_id}).execute()
+        r = supabase_client.table("tarjetas").select("*").eq("user_id", uid).execute()
         if r.data:
-            return r.data
+            return r.data[0]
+        numero = "4000 " + " ".join([str(random.randint(1000, 9999)) for _ in range(3)])
+        cvv = str(random.randint(100, 999))
+        fecha = str(random.randint(1, 12)).zfill(2) + "/" + str(datetime.now().year + 4)[-2:]
+        resp = supabase_client.table("tarjetas").insert({
+            "user_id": uid,
+            "numero": numero,
+            "cvv": cvv,
+            "fecha_expiracion": fecha,
+            "cupo_total": 3000000,
+            "cupo_disponible": 3000000,
+        }).execute()
+        return resp.data[0] if resp.data else None
     except Exception:
-        pass
-    return None
+        return None
+
+
+def cambiar_estado_tarjeta(tarjeta_id, nuevo_estado):
+    restaurar_sesion()
+    try:
+        supabase_client.table("tarjetas").update({
+            "estado": nuevo_estado,
+        }).eq("id", tarjeta_id).execute()
+        return True
+    except Exception:
+        return False
+
+
+# ============ FLOWSAVE ============
+
+def crear_meta(uid, nombre, objetivo, fecha_limite, icono):
+    restaurar_sesion()
+    try:
+        resp = supabase_client.table("metas_ahorro").insert({
+            "user_id": uid,
+            "nombre": nombre,
+            "monto_objetivo": float(objetivo),
+            "fecha_limite": fecha_limite,
+            "icono": icono,
+        }).execute()
+        return resp.data[0] if resp.data else None
+    except Exception:
+        return None
+
+
+def obtener_metas(uid):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("metas_ahorro").select("*").eq("user_id", uid).order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception:
+        return []
+
+
+def aportar_meta(meta_id, monto):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("metas_ahorro").select("monto_actual").eq("id", meta_id).execute()
+        if not r.data:
+            return False
+        actual = float(r.data[0]["monto_actual"])
+        supabase_client.table("metas_ahorro").update({
+            "monto_actual": actual + float(monto),
+        }).eq("id", meta_id).execute()
+        return True
+    except Exception:
+        return False
+
+
+# ============ FLOWINVEST ============
+
+def crear_inversion(uid, producto, monto, rendimiento):
+    restaurar_sesion()
+    try:
+        resp = supabase_client.table("inversiones").insert({
+            "user_id": uid,
+            "producto": producto,
+            "monto_invertido": float(monto),
+            "rendimiento_anual": float(rendimiento),
+            "valor_actual": float(monto),
+            "estado": "activo",
+        }).execute()
+        return resp.data[0] if resp.data else None
+    except Exception:
+        return None
+
+
+def obtener_inversiones(uid):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("inversiones").select("*").eq("user_id", uid).order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception:
+        return []
+
+
+# ============ FLOWSHIELD ============
+
+def contratar_seguro(uid, tipo, cobertura, prima):
+    restaurar_sesion()
+    try:
+        resp = supabase_client.table("seguros").insert({
+            "user_id": uid,
+            "tipo": tipo,
+            "cobertura": float(cobertura),
+            "prima_mensual": float(prima),
+            "estado": "activo",
+        }).execute()
+        return resp.data[0] if resp.data else None
+    except Exception:
+        return None
+
+
+def obtener_seguros(uid):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("seguros").select("*").eq("user_id", uid).order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception:
+        return []
+
+
+# ============ FLOWBUSINESS ============
+
+def crear_cuenta_empresarial(uid, nombre_negocio, nit, categoria):
+    restaurar_sesion()
+    try:
+        resp = supabase_client.table("cuentas_empresariales").insert({
+            "user_id": uid,
+            "nombre_negocio": nombre_negocio,
+            "nit": nit,
+            "categoria": categoria,
+            "saldo": 0,
+        }).execute()
+        return resp.data[0] if resp.data else None
+    except Exception:
+        return None
+
+
+def obtener_cuentas_empresariales(uid):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("cuentas_empresariales").select("*").eq("user_id", uid).order("created_at", desc=True).execute()
+        return r.data or []
+    except Exception:
+        return []
+
+
+# ============ MOVIMIENTOS ============
+
+def obtener_movimientos(uid, limite=100):
+    restaurar_sesion()
+    try:
+        r = supabase_client.table("movimientos").select("*").eq("user_id", uid).order("created_at", desc=True).limit(limite).execute()
+        return r.data or []
+    except Exception:
+        return []
+
+
+# ============ RECARGAR Y RETIRAR ============
+
+def recargar_saldo(monto):
+    restaurar_sesion()
+    try:
+        resp = supabase_client.rpc("recargar_saldo", {"p_monto": float(monto)}).execute()
+        return resp.data
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+def retirar_saldo(monto):
+    restaurar_sesion()
+    try:
+        resp = supabase_client.rpc("retirar_saldo", {"p_monto": float(monto)}).execute()
+        return resp.data
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+def pagar_servicio(servicio, monto):
+    restaurar_sesion()
+    try:
+        resp = supabase_client.rpc("pagar_servicio", {
+            "p_servicio": servicio,
+            "p_monto": float(monto),
+        }).execute()
+        return resp.data
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+# ============ ANALYTICS ============
+
+def obtener_estadisticas_analytics(uid):
+    restaurar_sesion()
+    try:
+        movs = obtener_movimientos(uid, 500)
+        ingresos = sum(m["monto"] for m in movs if m["tipo"] == "ingreso")
+        egresos = sum(m["monto"] for m in movs if m["tipo"] == "egreso")
+        return {
+            "total_ingresos": ingresos,
+            "total_egresos": egresos,
+            "balance": ingresos - egresos,
+            "num_movimientos": len(movs),
+        }
+    except Exception:
+        return {"total_ingresos": 0, "total_egresos": 0, "balance": 0, "num_movimientos": 0}
 
 
 # ============ ESTADO ============
@@ -833,7 +1037,7 @@ if "onboarding_ok" not in st.session_state:
 
 if st.session_state["user"] is None:
     st.title("💳 FlowCredit Digital")
-    st.caption("Solucion financiera innovadora para emprendedores digitales")
+    st.caption("Tu banco digital para emprendedores")
     st.divider()
 
     tab1, tab2 = st.tabs(["🔐 Iniciar sesion", "✨ Crear cuenta"])
@@ -891,28 +1095,27 @@ if st.session_state["onboarding_ok"] is None:
 
 if not st.session_state["onboarding_ok"]:
     st.title("👋 Bienvenido a FlowCredit Digital")
-    st.caption("Tu solucion de credito para emprendedores digitales")
+    st.caption("Tu banco digital para emprendedores")
     st.divider()
 
     paso = st.session_state.get("onboarding_paso", 1)
 
     if paso == 1:
-        st.subheader("💳 Que es FlowCredit?")
-        st.write("FlowCredit Digital es una plataforma que analiza tu flujo de caja digital y te ofrece credito personalizado en menos de 24 horas.")
+        st.subheader("💳 Todo un banco en tu bolsillo")
+        st.write("FlowCredit Digital es tu banco digital completo: transferencias, tarjeta, ahorro, inversiones, seguros y creditos con IA.")
         if st.button("Siguiente", use_container_width=True, type="primary"):
             st.session_state["onboarding_paso"] = 2
             st.rerun()
     elif paso == 2:
         st.subheader("🤖 Inteligencia artificial")
-        st.write("Nuestro motor de IA analiza tus ingresos digitales y calcula tu score crediticio en segundos.")
+        st.write("Analizamos tu flujo de caja digital y te damos creditos personalizados en menos de 24 horas.")
         if st.button("Siguiente", use_container_width=True, type="primary"):
             st.session_state["onboarding_paso"] = 3
             st.rerun()
     elif paso == 3:
-        st.subheader("📋 Solo 3 pasos")
-        st.write("1. Verifica tu identidad con reconocimiento facial")
-        st.write("2. Solicita tu credito en 1 minuto")
-        st.write("3. Recibe el desembolso en menos de 24 horas")
+        st.subheader("📋 7 productos Flow")
+        st.write("FlowPay, FlowCard, FlowSave, FlowInvest, FlowShield, FlowBusiness y FlowCredit.")
+        st.write("Todo en una sola app, disenada para emprendedores digitales.")
         if st.button("Empezar ahora", use_container_width=True, type="primary"):
             completar_onboarding(uid)
             st.session_state["onboarding_ok"] = True
@@ -942,11 +1145,18 @@ with st.sidebar:
         [
             "📊 Dashboard",
             "💸 FlowPay",
+            "💳 FlowCard",
+            "🏦 FlowSave",
+            "📈 FlowInvest",
+            "🛡️ FlowShield",
+            "💼 FlowBusiness",
+            "📊 FlowAnalytics",
             "🧮 Simulador",
             "🛡️ Verificacion",
             "💳 Solicitar credito",
             "💼 Mis creditos",
             "📄 Contrato",
+            "📋 Movimientos",
             "📋 Historial",
             etiqueta_notif,
             "📜 Terminos",
@@ -969,19 +1179,18 @@ with st.sidebar:
 
 if menu == "📊 Dashboard":
     st.title("📊 Dashboard")
-    st.caption("Vista general de tu ecosistema financiero")
+    st.caption("Vista general de tu banco digital")
 
     solicitudes = obtener_solicitudes(uid)
     creditos = obtener_creditos_activos(uid)
     saldo = obtener_saldo(uid)
+    movs = obtener_movimientos(uid, 5)
 
-    linea_disponible = 2500000
     score_actual = 742
     if solicitudes:
         aprobadas = [s for s in solicitudes if s.get("decision") == "APROBADO"]
         if aprobadas:
             score_actual = aprobadas[0]["score"]
-            linea_disponible = int(aprobadas[0]["monto_aprobado"])
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -1010,23 +1219,25 @@ if menu == "📊 Dashboard":
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("🔗 Fuentes digitales conectadas")
-    col_a, col_b, col_c, col_d = st.columns(4)
-    with col_a:
-        st.success("💳 Stripe - Conectado")
-    with col_b:
-        st.success("🟣 Nequi - Conectado")
-    with col_c:
-        st.success("🔵 PayPal - Conectado")
-    with col_d:
-        st.warning("🟢 Daviplata - Pendiente")
+    if movs:
+        st.subheader("📋 Ultimos movimientos")
+        filas = []
+        for m in movs:
+            signo = "+" if m["tipo"] == "ingreso" else "-"
+            monto_fmt = signo + "$" + "{:,.0f}".format(m["monto"]).replace(",", ".")
+            filas.append({
+                "Fecha": (m.get("created_at") or "")[:16].replace("T", " "),
+                "Descripcion": m["descripcion"],
+                "Monto": monto_fmt,
+            })
+        st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
 
 
 # ============ FLOWPAY ============
 
 elif menu == "💸 FlowPay":
     st.title("💸 FlowPay")
-    st.caption("Transferencias digitales instantaneas entre usuarios registrados")
+    st.caption("Transferencias digitales instantaneas")
 
     cuenta = obtener_cuenta(uid)
     saldo = float(cuenta["saldo"]) if cuenta else 0
@@ -1042,74 +1253,100 @@ elif menu == "💸 FlowPay":
 
     st.divider()
 
-    tab_enviar, tab_historial = st.tabs(["📤 Enviar dinero", "📥 Historial"])
+    tab_enviar, tab_recargar, tab_retirar, tab_servicios, tab_historial = st.tabs([
+        "📤 Enviar", "📥 Recargar", "💸 Retirar", "💡 Servicios", "📜 Historial"
+    ])
 
     with tab_enviar:
         if saldo <= 0:
-            st.warning("No tienes saldo disponible para transferir.")
+            st.warning("No tienes saldo disponible.")
         else:
-            st.subheader("Nueva transferencia")
-
             usuarios_reg = obtener_usuarios_registrados()
             otros = [u for u in usuarios_reg if u.get("user_id") != uid and u.get("email")]
             opciones_emails = [u["email"] for u in otros]
 
             with st.form("form_transferir"):
-                modo = st.radio(
-                    "Como quieres elegir al destinatario",
-                    ["Elegir de la lista", "Escribir correo"],
-                    horizontal=True,
-                )
-
-                if modo == "Elegir de la lista":
+                modo = st.radio("Como elegir destinatario", ["De la lista", "Escribir correo"], horizontal=True)
+                if modo == "De la lista":
                     if not opciones_emails:
-                        st.warning("Aun no hay otros usuarios registrados en la plataforma.")
+                        st.warning("Aun no hay otros usuarios registrados.")
                         receptor = None
                     else:
                         receptor = st.selectbox("Destinatario", opciones_emails)
                 else:
                     receptor = st.text_input("Correo del destinatario")
 
-                monto = st.number_input(
-                    "Monto a transferir (COP)",
-                    min_value=1000,
-                    max_value=int(saldo),
-                    value=min(100000, int(saldo)),
-                    step=1000,
-                )
+                monto = st.number_input("Monto (COP)", min_value=1000, max_value=int(saldo), value=min(100000, int(saldo)), step=1000)
                 concepto = st.text_input("Concepto (opcional)", max_chars=80)
-
                 enviar = st.form_submit_button("📤 Transferir", use_container_width=True, type="primary")
 
             if enviar:
                 if not receptor:
-                    st.error("Debes seleccionar o escribir un destinatario.")
+                    st.error("Selecciona o escribe un destinatario.")
                 elif receptor.strip().lower() == email.lower():
                     st.error("No puedes transferirte a ti mismo.")
                 else:
-                    with st.spinner("Procesando transferencia..."):
+                    with st.spinner("Procesando..."):
                         resultado = transferir(receptor.strip().lower(), monto, concepto or "Sin concepto")
-
                     if resultado and resultado.get("success"):
                         monto_fmt = "{:,.0f}".format(monto).replace(",", ".")
                         st.success("✅ Transferencia exitosa")
-                        st.info("Enviaste $" + monto_fmt + " a " + receptor)
-                        crear_notificacion(
-                            uid,
-                            "💸 Transferencia enviada",
-                            "Enviaste $" + monto_fmt + " a " + receptor,
-                            "success",
-                        )
+                        crear_notificacion(uid, "💸 Transferencia enviada", "Enviaste $" + monto_fmt + " a " + receptor, "success")
                         st.balloons()
                         st.rerun()
                     else:
-                        msg = resultado.get("message", "Error desconocido") if resultado else "Error"
-                        st.error("❌ " + msg)
+                        st.error("❌ " + (resultado.get("message", "Error") if resultado else "Error"))
+
+    with tab_recargar:
+        st.subheader("Recargar saldo")
+        with st.form("form_recargar"):
+            monto_rec = st.number_input("Monto a recargar (COP)", min_value=10000, max_value=10000000, value=100000, step=10000)
+            rec = st.form_submit_button("📥 Recargar", use_container_width=True, type="primary")
+        if rec:
+            resultado = recargar_saldo(monto_rec)
+            if resultado and resultado.get("success"):
+                st.success("✅ Recarga exitosa")
+                st.rerun()
+            else:
+                st.error(resultado.get("message", "Error") if resultado else "Error")
+
+    with tab_retirar:
+        st.subheader("Retirar a banco externo")
+        if saldo <= 0:
+            st.warning("No tienes saldo disponible.")
+        else:
+            with st.form("form_retirar"):
+                monto_ret = st.number_input("Monto a retirar (COP)", min_value=10000, max_value=int(saldo), value=min(50000, int(saldo)), step=10000)
+                ret = st.form_submit_button("💸 Retirar", use_container_width=True, type="primary")
+            if ret:
+                resultado = retirar_saldo(monto_ret)
+                if resultado and resultado.get("success"):
+                    st.success("✅ Retiro exitoso")
+                    st.rerun()
+                else:
+                    st.error(resultado.get("message", "Error") if resultado else "Error")
+
+    with tab_servicios:
+        st.subheader("Pagar servicios")
+        servicios = [
+            ("Claro", 45000), ("Movistar", 52000), ("Tigo", 38000),
+            ("EPM", 85000), ("Netflix", 32000), ("Spotify", 18000),
+        ]
+        with st.form("form_servicio"):
+            servicio_sel = st.selectbox("Servicio", [s[0] for s in servicios])
+            monto_pago = st.number_input("Monto (COP)", min_value=1000, max_value=500000, value=45000, step=1000)
+            pagar = st.form_submit_button("💡 Pagar", use_container_width=True, type="primary")
+        if pagar:
+            resultado = pagar_servicio(servicio_sel, monto_pago)
+            if resultado and resultado.get("success"):
+                st.success("✅ Pago exitoso")
+                st.rerun()
+            else:
+                st.error(resultado.get("message", "Error") if resultado else "Error")
 
     with tab_historial:
         st.subheader("Movimientos recientes")
         transferencias = obtener_transferencias(uid)
-
         if not transferencias:
             st.info("Aun no has realizado transferencias.")
         else:
@@ -1128,6 +1365,329 @@ elif menu == "💸 FlowPay":
             st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
 
 
+# ============ FLOWCARD ============
+
+elif menu == "💳 FlowCard":
+    st.title("💳 FlowCard")
+    st.caption("Tu tarjeta digital FlowCredit")
+
+    tarjeta = obtener_tarjeta(uid)
+
+    if not tarjeta:
+        st.error("No se pudo cargar tu tarjeta.")
+    else:
+        estado = tarjeta.get("estado", "activa")
+        color_bg = "linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #312E81 100%)" if estado == "activa" else "linear-gradient(135deg, #6B7280 0%, #4B5563 100%)"
+
+        st.markdown(
+            '<div style="background:' + color_bg + ';color:white;border-radius:20px;padding:32px;max-width:420px;margin:auto;box-shadow:0 20px 60px rgba(15,23,42,0.4);">'
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:40px;">'
+            '<span style="font-weight:900;font-size:18px;letter-spacing:1px;">FLOWCREDIT</span>'
+            '<span style="font-size:26px;">💳</span>'
+            '</div>'
+            '<div style="font-size:22px;letter-spacing:3px;font-family:monospace;margin-bottom:32px;">' + tarjeta["numero"] + '</div>'
+            '<div style="display:flex;justify-content:space-between;font-size:12px;">'
+            '<div><div style="opacity:0.6;margin-bottom:4px;">TITULAR</div><div style="font-weight:700;">' + nombre.upper() + '</div></div>'
+            '<div><div style="opacity:0.6;margin-bottom:4px;">VENCE</div><div style="font-weight:700;">' + str(tarjeta.get("fecha_expiracion", "")) + '</div></div>'
+            '<div><div style="opacity:0.6;margin-bottom:4px;">CVV</div><div style="font-weight:700;">' + str(tarjeta.get("cvv", "")) + '</div></div>'
+            '</div>'
+            '<div style="margin-top:24px;text-align:right;font-weight:900;font-size:18px;">VISA</div>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.metric("Cupo total", "$" + "{:,.0f}".format(tarjeta["cupo_total"]).replace(",", "."))
+        with col_b:
+            st.metric("Cupo disponible", "$" + "{:,.0f}".format(tarjeta["cupo_disponible"]).replace(",", "."))
+
+        st.divider()
+
+        if estado == "activa":
+            if st.button("🔒 Congelar tarjeta", use_container_width=True, type="primary"):
+                if cambiar_estado_tarjeta(tarjeta["id"], "congelada"):
+                    st.success("Tarjeta congelada")
+                    st.rerun()
+        else:
+            if st.button("🔓 Descongelar tarjeta", use_container_width=True, type="primary"):
+                if cambiar_estado_tarjeta(tarjeta["id"], "activa"):
+                    st.success("Tarjeta activada")
+                    st.rerun()
+
+
+# ============ FLOWSAVE ============
+
+elif menu == "🏦 FlowSave":
+    st.title("🏦 FlowSave")
+    st.caption("Ahorro programado para tus metas")
+
+    saldo = obtener_saldo(uid)
+
+    tab_ver, tab_crear = st.tabs(["🎯 Mis metas", "➕ Nueva meta"])
+
+    with tab_ver:
+        metas = obtener_metas(uid)
+        if not metas:
+            st.info("Aun no tienes metas de ahorro.")
+        else:
+            for meta in metas:
+                progreso = meta["monto_actual"] / meta["monto_objetivo"] if meta["monto_objetivo"] > 0 else 0
+                st.subheader(meta.get("icono", "🎯") + " " + meta["nombre"])
+                col_a, col_b, col_c = st.columns(3)
+                with col_a:
+                    st.metric("Meta", "$" + "{:,.0f}".format(meta["monto_objetivo"]).replace(",", "."))
+                with col_b:
+                    st.metric("Ahorrado", "$" + "{:,.0f}".format(meta["monto_actual"]).replace(",", "."))
+                with col_c:
+                    st.metric("Progreso", "{:.1f}%".format(progreso * 100))
+                st.progress(min(progreso, 1.0))
+
+                if meta.get("fecha_limite"):
+                    st.caption("📅 Fecha limite: " + str(meta["fecha_limite"]))
+
+                if saldo > 0:
+                    with st.form("aportar_" + str(meta["id"])):
+                        monto_aporte = st.number_input("Aportar (COP)", min_value=10000, max_value=int(saldo), value=min(50000, int(saldo)), step=10000, key="ap_" + str(meta["id"]))
+                        aportar = st.form_submit_button("💰 Aportar", use_container_width=True)
+                    if aportar:
+                        if aportar_meta(meta["id"], monto_aporte):
+                            st.success("Aporte registrado")
+                            st.rerun()
+
+                st.divider()
+
+    with tab_crear:
+        with st.form("nueva_meta"):
+            nombre_meta = st.text_input("Nombre de la meta")
+            objetivo = st.number_input("Monto objetivo (COP)", min_value=50000, max_value=50000000, value=500000, step=50000)
+            fecha_lim = st.date_input("Fecha limite")
+            icono_meta = st.selectbox("Icono", ["🎯", "✈️", "🏠", "🚗", "💻", "📱", "🎓", "💍", "🏖️"])
+            crear = st.form_submit_button("Crear meta", use_container_width=True, type="primary")
+        if crear:
+            if not nombre_meta:
+                st.error("Escribe un nombre")
+            else:
+                if crear_meta(uid, nombre_meta, objetivo, str(fecha_lim), icono_meta):
+                    st.success("Meta creada")
+                    st.rerun()
+
+
+# ============ FLOWINVEST ============
+
+elif menu == "📈 FlowInvest":
+    st.title("📈 FlowInvest")
+    st.caption("Haz crecer tu dinero")
+
+    inversiones = obtener_inversiones(uid)
+    saldo = obtener_saldo(uid)
+
+    productos_disponibles = [
+        ("CDT Digital", 10.5, "Bajo riesgo, plazo 90 dias"),
+        ("Fondo Conservador", 12.0, "Riesgo medio, liquidez inmediata"),
+        ("Fondo Crecimiento", 15.5, "Riesgo alto, plazo 1 ano"),
+        ("Portafolio Emprendedor", 18.0, "Diversificado, riesgo alto"),
+    ]
+
+    tab_ver, tab_invertir = st.tabs(["💼 Mis inversiones", "➕ Invertir"])
+
+    with tab_ver:
+        if not inversiones:
+            st.info("Aun no tienes inversiones activas.")
+        else:
+            total_invertido = sum(i["monto_invertido"] for i in inversiones)
+            total_actual = sum(i["valor_actual"] for i in inversiones)
+            rendimiento = total_actual - total_invertido
+
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                st.metric("Total invertido", "$" + "{:,.0f}".format(total_invertido).replace(",", "."))
+            with col_b:
+                st.metric("Valor actual", "$" + "{:,.0f}".format(total_actual).replace(",", "."))
+            with col_c:
+                st.metric("Rendimiento", "$" + "{:,.0f}".format(rendimiento).replace(",", "."))
+
+            st.divider()
+
+            for inv in inversiones:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric(inv["producto"], "$" + "{:,.0f}".format(inv["monto_invertido"]).replace(",", "."))
+                with col2:
+                    st.metric("Rendimiento anual", str(inv["rendimiento_anual"]) + "%")
+                with col3:
+                    st.metric("Valor actual", "$" + "{:,.0f}".format(inv["valor_actual"]).replace(",", "."))
+                st.divider()
+
+    with tab_invertir:
+        st.subheader("Productos disponibles")
+
+        for nombre_prod, rend, desc in productos_disponibles:
+            st.markdown("**" + nombre_prod + "** — " + str(rend) + "% anual")
+            st.caption(desc)
+
+        st.divider()
+
+        if saldo <= 0:
+            st.warning("No tienes saldo para invertir.")
+        else:
+            with st.form("nueva_inversion"):
+                producto_sel = st.selectbox("Producto", [p[0] for p in productos_disponibles])
+                monto_inv = st.number_input("Monto (COP)", min_value=100000, max_value=int(saldo), value=min(100000, int(saldo)), step=100000)
+                invertir = st.form_submit_button("💰 Invertir", use_container_width=True, type="primary")
+
+            if invertir:
+                rend_sel = [p[1] for p in productos_disponibles if p[0] == producto_sel][0]
+                if crear_inversion(uid, producto_sel, monto_inv, rend_sel):
+                    retirar_saldo(monto_inv)
+                    st.success("Inversion creada")
+                    st.rerun()
+
+
+# ============ FLOWSHIELD ============
+
+elif menu == "🛡️ FlowShield":
+    st.title("🛡️ FlowShield")
+    st.caption("Seguros digitales para emprendedores")
+
+    seguros = obtener_seguros(uid)
+
+    tipos_seguro = [
+        ("Vida", 50000000, 45000),
+        ("Negocio", 20000000, 28000),
+        ("Fraude digital", 5000000, 12000),
+        ("Incendio/Hurto", 15000000, 22000),
+        ("Salud", 10000000, 35000),
+    ]
+
+    tab_ver, tab_contratar = st.tabs(["📋 Mis polizas", "➕ Contratar"])
+
+    with tab_ver:
+        if not seguros:
+            st.info("No tienes polizas activas.")
+        else:
+            for s in seguros:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Tipo", s["tipo"])
+                with col2:
+                    st.metric("Cobertura", "$" + "{:,.0f}".format(s["cobertura"]).replace(",", "."))
+                with col3:
+                    st.metric("Prima mensual", "$" + "{:,.0f}".format(s["prima_mensual"]).replace(",", "."))
+                st.divider()
+
+    with tab_contratar:
+        for tipo, cobertura, prima in tipos_seguro:
+            st.markdown("**Seguro de " + tipo + "** — Cobertura hasta $" + "{:,.0f}".format(cobertura).replace(",", ".") + " — $" + "{:,.0f}".format(prima).replace(",", ".") + "/mes")
+
+        st.divider()
+
+        with st.form("contratar_seguro"):
+            tipo_sel = st.selectbox("Tipo de seguro", [t[0] for t in tipos_seguro])
+            contratar = st.form_submit_button("Contratar poliza", use_container_width=True, type="primary")
+
+        if contratar:
+            info = [t for t in tipos_seguro if t[0] == tipo_sel][0]
+            if contratar_seguro(uid, tipo_sel, info[1], info[2]):
+                st.success("Poliza contratada")
+                st.rerun()
+
+
+# ============ FLOWBUSINESS ============
+
+elif menu == "💼 FlowBusiness":
+    st.title("💼 FlowBusiness")
+    st.caption("Cuenta empresarial para tu negocio")
+
+    cuentas_emp = obtener_cuentas_empresariales(uid)
+
+    tab_ver, tab_crear = st.tabs(["🏢 Mis cuentas", "➕ Nueva cuenta"])
+
+    with tab_ver:
+        if not cuentas_emp:
+            st.info("Aun no tienes cuentas empresariales.")
+        else:
+            for c in cuentas_emp:
+                st.subheader("🏢 " + c["nombre_negocio"])
+                col_a, col_b, col_c = st.columns(3)
+                with col_a:
+                    st.metric("NIT", c.get("nit", "N/A"))
+                with col_b:
+                    st.metric("Categoria", c.get("categoria", "General"))
+                with col_c:
+                    st.metric("Saldo", "$" + "{:,.0f}".format(c["saldo"]).replace(",", "."))
+                st.divider()
+
+    with tab_crear:
+        with st.form("nueva_empresa"):
+            nombre_neg = st.text_input("Nombre del negocio")
+            nit_neg = st.text_input("NIT (opcional)")
+            categoria_neg = st.selectbox("Categoria", ["E-commerce", "Servicios", "Tecnologia", "Alimentos", "Moda", "Educacion", "Otro"])
+            crear_c = st.form_submit_button("Crear cuenta empresarial", use_container_width=True, type="primary")
+        if crear_c:
+            if not nombre_neg:
+                st.error("Escribe el nombre del negocio")
+            else:
+                if crear_cuenta_empresarial(uid, nombre_neg, nit_neg, categoria_neg):
+                    st.success("Cuenta empresarial creada")
+                    st.rerun()
+
+
+# ============ FLOWANALYTICS ============
+
+elif menu == "📊 FlowAnalytics":
+    st.title("📊 FlowAnalytics")
+    st.caption("Analisis financiero de tu actividad")
+
+    stats = obtener_estadisticas_analytics(uid)
+
+    col_a, col_b, col_c, col_d = st.columns(4)
+    with col_a:
+        st.metric("Ingresos", "$" + "{:,.0f}".format(stats["total_ingresos"]).replace(",", "."))
+    with col_b:
+        st.metric("Egresos", "$" + "{:,.0f}".format(stats["total_egresos"]).replace(",", "."))
+    with col_c:
+        st.metric("Balance", "$" + "{:,.0f}".format(stats["balance"]).replace(",", "."))
+    with col_d:
+        st.metric("Movimientos", stats["num_movimientos"])
+
+    st.divider()
+
+    movs = obtener_movimientos(uid, 100)
+
+    if movs:
+        df = pd.DataFrame(movs)
+        df["fecha"] = df["created_at"].str[:10]
+
+        agrupado = df.groupby(["fecha", "tipo"])["monto"].sum().reset_index()
+
+        fig = go.Figure()
+        for tipo in ["ingreso", "egreso"]:
+            datos_tipo = agrupado[agrupado["tipo"] == tipo]
+            color = "#10b981" if tipo == "ingreso" else "#ef4444"
+            fig.add_trace(go.Bar(
+                x=datos_tipo["fecha"],
+                y=datos_tipo["monto"],
+                name=tipo.capitalize(),
+                marker_color=color,
+            ))
+        fig.update_layout(barmode="group", title="Flujo de movimientos", plot_bgcolor="white", height=400)
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("Por categoria")
+        if "categoria" in df.columns:
+            df_cat = df[df["categoria"].notna()]
+            if not df_cat.empty:
+                por_cat = df_cat.groupby("categoria")["monto"].sum().sort_values(ascending=False)
+                fig2 = go.Figure(data=[go.Pie(labels=por_cat.index, values=por_cat.values, hole=0.4)])
+                fig2.update_layout(height=400)
+                st.plotly_chart(fig2, use_container_width=True)
+    else:
+        st.info("No hay movimientos para analizar.")
+
+
 # ============ SIMULADOR ============
 
 elif menu == "🧮 Simulador":
@@ -1137,21 +1697,11 @@ elif menu == "🧮 Simulador":
     cliente = obtener_cliente_demo(email)
     ingresos_base = int(cliente["ingresos_declarados"]) if cliente else 3000000
 
-    st.subheader("⚙️ Configura tu credito")
     col1, col2 = st.columns(2)
-
     with col1:
-        monto_sim = st.slider(
-            "Monto (COP)",
-            min_value=100000, max_value=5000000,
-            value=1000000, step=100000,
-        )
+        monto_sim = st.slider("Monto (COP)", min_value=100000, max_value=5000000, value=1000000, step=100000)
     with col2:
-        plazo_sim = st.select_slider(
-            "Plazo (dias)",
-            options=[30, 60, 90, 120, 180],
-            value=90,
-        )
+        plazo_sim = st.select_slider("Plazo (dias)", options=[30, 60, 90, 120, 180], value=90)
 
     if cliente:
         score = cliente["score_datacredito"]
@@ -1166,13 +1716,11 @@ elif menu == "🧮 Simulador":
     else:
         tasa_est = 16.0
 
-    st.info("📊 Tasa estimada segun tu perfil: **" + str(tasa_est) + "% anual**")
+    st.info("📊 Tasa estimada: **" + str(tasa_est) + "% anual**")
 
     plan = simular_credito(monto_sim, plazo_sim, tasa_est)
 
     st.divider()
-    st.subheader("💰 Resultado de la simulacion")
-
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         st.metric("Cuotas", plan["num_cuotas"])
@@ -1189,7 +1737,7 @@ elif menu == "🧮 Simulador":
         st.metric("Cuota / Ingresos", "{:.1f}%".format(porcentaje_ingresos))
 
     if porcentaje_ingresos > 30:
-        st.warning("⚠️ La cuota supera el 30% de tus ingresos. Considera un plazo mas largo o un monto menor.")
+        st.warning("⚠️ La cuota supera el 30% de tus ingresos.")
     else:
         st.success("✅ La cuota esta dentro de tu capacidad de pago")
 
@@ -1199,11 +1747,11 @@ elif menu == "🧮 Simulador":
 
     col_f, col_g, col_h = st.columns(3)
     with col_f:
-        st.metric("Ingresos mensuales", "$" + "{:,.0f}".format(ingresos_base).replace(",", "."))
+        st.metric("Ingresos", "$" + "{:,.0f}".format(ingresos_base).replace(",", "."))
     with col_g:
-        st.metric("Egresos estimados", "$" + "{:,.0f}".format(int(cap["egresos_estimados"])).replace(",", "."))
+        st.metric("Egresos est.", "$" + "{:,.0f}".format(int(cap["egresos_estimados"])).replace(",", "."))
     with col_h:
-        st.metric("Capacidad maxima", "$" + "{:,.0f}".format(int(cap["capacidad_maxima"])).replace(",", "."))
+        st.metric("Capacidad max.", "$" + "{:,.0f}".format(int(cap["capacidad_maxima"])).replace(",", "."))
 
     if cap["semaforo"] == "verde":
         st.success("🟢 " + cap["mensaje"])
@@ -1212,42 +1760,34 @@ elif menu == "🧮 Simulador":
     else:
         st.error("🔴 " + cap["mensaje"])
 
-    st.divider()
-    st.info("💡 Ve al menu lateral y toca 'Solicitar credito' para aplicar con estos valores")
-
 
 # ============ VERIFICACION ============
 
 elif menu == "🛡️ Verificacion":
     st.title("🛡️ Verificacion de identidad")
-    st.caption("Consulta tus datos verificados y completa tu verificacion biometrica")
+    st.caption("Verifica tu identidad con reconocimiento facial")
 
     cliente = obtener_cliente_demo(email)
 
     if not cliente:
-        st.warning("No se encontraron datos verificados para tu correo.")
-        st.info("Esta es una cuenta registrada sin perfil demo precargado. Puedes continuar con la verificacion biometrica.")
+        st.warning("No se encontraron datos demo precargados para tu correo.")
     else:
-        st.success("✅ Identidad Verificada - Datos consultados en bases oficiales")
-        st.divider()
-
+        st.success("✅ Identidad Verificada")
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Nombre completo", cliente["nombre_completo"])
+            st.metric("Nombre", cliente["nombre_completo"])
             st.metric("Cedula", cliente["cedula"])
-            st.metric("Fecha de nacimiento", str(cliente["fecha_nacimiento"]))
             st.metric("Telefono", cliente["telefono"])
         with col2:
-            st.metric("Direccion", cliente["direccion"])
             st.metric("Ciudad", cliente["ciudad"])
             st.metric("Ocupacion", cliente["ocupacion"])
-            st.metric("Score Datacredito", cliente["score_datacredito"])
+            st.metric("Score", cliente["score_datacredito"])
 
     st.divider()
-    st.subheader("🔐 Verificacion biometrica con reconocimiento facial")
+    st.subheader("🔐 Verificacion biometrica")
     st.info("Toma una foto de tu rostro de frente, con buena luz.")
 
-    foto = st.camera_input("📸 Toma una foto de tu rostro")
+    foto = st.camera_input("📸 Toma una foto")
 
     if foto is not None:
         imagen_bytes = foto.getvalue()
@@ -1255,36 +1795,29 @@ elif menu == "🛡️ Verificacion":
             tiene_rostro, cantidad = detectar_rostro(imagen_bytes)
 
         if not tiene_rostro:
-            st.error("❌ No se reconoce un rostro. Intenta con mejor luz y rostro de frente.")
+            st.error("❌ No se reconoce un rostro.")
         else:
-            st.success("✅ Rostro detectado (" + str(cantidad) + " rostro(s))")
-            with st.spinner("Guardando verificacion..."):
+            st.success("✅ Rostro detectado (" + str(cantidad) + ")")
+            with st.spinner("Guardando..."):
                 url = subir_foto_verificacion(uid, imagen_bytes)
                 if url:
                     guardar_verificacion(uid, url, "verificado")
-                    st.success("🎉 Identidad verificada correctamente")
+                    st.success("🎉 Identidad verificada")
                     st.balloons()
-                else:
-                    st.warning("Rostro detectado, pero no se pudo guardar la foto.")
 
     st.divider()
     st.subheader("🔑 Codigo de recuperacion")
-    st.caption("Sistema de recuperacion basado en claves criptograficas.")
 
     codigo_info = obtener_codigo_recuperacion(uid)
     if codigo_info and codigo_info.get("recovery_code"):
-        st.warning("⚠️ Guarda este codigo en un lugar seguro.")
+        st.warning("⚠️ Guarda este codigo.")
         st.code(codigo_info["recovery_code"], language=None)
     else:
-        st.info("Aun no has generado tu codigo de recuperacion.")
         if st.button("🔐 Generar codigo de recuperacion", use_container_width=True, type="primary"):
-            with st.spinner("Generando..."):
-                codigo = guardar_codigo_recuperacion(uid)
+            codigo = guardar_codigo_recuperacion(uid)
             if codigo:
-                st.success("✅ Codigo generado")
+                st.success("Codigo generado")
                 st.rerun()
-            else:
-                st.error("No se pudo generar el codigo.")
 
 
 # ============ SOLICITAR CREDITO ============
@@ -1295,9 +1828,7 @@ elif menu == "💳 Solicitar credito":
 
     cliente = obtener_cliente_demo(email)
     if cliente:
-        st.success("✅ Cliente verificado: " + cliente["nombre_completo"] + " | Cedula " + cliente["cedula"] + " | Score " + str(cliente["score_datacredito"]))
-    else:
-        st.warning("⚠️ No tienes perfil demo precargado. Puedes continuar con la solicitud.")
+        st.success("✅ " + cliente["nombre_completo"] + " | " + cliente["cedula"] + " | Score " + str(cliente["score_datacredito"]))
 
     if st.session_state["resultado_actual"] is None:
         ingresos_default = int(cliente["ingresos_declarados"]) if cliente else 3000000
@@ -1305,125 +1836,68 @@ elif menu == "💳 Solicitar credito":
         with st.form("solicitud"):
             col1, col2 = st.columns(2)
             with col1:
-                tipo = st.selectbox(
-                    "Tipo de negocio digital",
-                    ["E-commerce", "Creador de contenido", "Servicios digitales", "SaaS / App", "Marketing digital", "Otro"],
-                )
-                ingresos = st.number_input(
-                    "Ingresos mensuales promedio (COP)",
-                    min_value=500000, max_value=50000000,
-                    value=ingresos_default, step=100000,
-                )
+                tipo = st.selectbox("Tipo de negocio", ["E-commerce", "Creador de contenido", "Servicios digitales", "SaaS / App", "Marketing digital", "Otro"])
+                ingresos = st.number_input("Ingresos mensuales (COP)", min_value=500000, max_value=50000000, value=ingresos_default, step=100000)
                 meses = st.number_input("Meses con el negocio", min_value=1, max_value=120, value=12)
             with col2:
-                monto = st.number_input(
-                    "Monto solicitado (COP)",
-                    min_value=100000, max_value=5000000,
-                    value=1000000, step=100000,
-                )
-                plazo = st.selectbox(
-                    "Plazo",
-                    [30, 60, 90, 120, 180],
-                    format_func=lambda x: str(x) + " dias",
-                )
-                historial = st.selectbox(
-                    "Historial de pagos previos",
-                    ["Sin historial", "1 credito pagado", "2-3 creditos pagados", "Mas de 3 creditos"],
-                )
+                monto = st.number_input("Monto solicitado (COP)", min_value=100000, max_value=5000000, value=1000000, step=100000)
+                plazo = st.selectbox("Plazo", [30, 60, 90, 120, 180], format_func=lambda x: str(x) + " dias")
+                historial = st.selectbox("Historial", ["Sin historial", "1 credito pagado", "2-3 creditos pagados", "Mas de 3 creditos"])
 
-            fuentes = st.multiselect(
-                "Fuentes digitales conectadas",
-                ["Stripe", "Nequi", "Daviplata", "PayPal", "Wompi", "Mercado Pago"],
-                default=["Stripe", "Nequi"],
-            )
-
+            fuentes = st.multiselect("Fuentes digitales", ["Stripe", "Nequi", "Daviplata", "PayPal", "Wompi", "Mercado Pago"], default=["Stripe", "Nequi"])
             enviado = st.form_submit_button("🔍 Analizar con IA", use_container_width=True, type="primary")
 
         if enviado:
             if not fuentes:
-                st.warning("Debes conectar al menos una fuente digital.")
+                st.warning("Conecta al menos una fuente.")
             else:
-                datos = {
-                    "tipo": tipo,
-                    "ingresos": ingresos,
-                    "meses": meses,
-                    "monto": monto,
-                    "plazo": plazo,
-                    "historial": historial,
-                    "fuentes": ", ".join(fuentes),
-                }
-
-                with st.spinner("🤖 Analizando tu perfil..."):
+                datos = {"tipo": tipo, "ingresos": ingresos, "meses": meses, "monto": monto, "plazo": plazo, "historial": historial, "fuentes": ", ".join(fuentes)}
+                with st.spinner("Analizando..."):
                     try:
                         texto_ia = analizar_con_ia(datos)
                         resultado = parsear_respuesta(texto_ia, ingresos=ingresos)
                     except Exception as e:
-                        st.error("Error al analizar: " + str(e))
+                        st.error("Error: " + str(e))
                         st.stop()
-
                 guardar_solicitud(uid, datos, resultado)
                 st.session_state["resultado_actual"] = resultado
                 st.session_state["datos_actuales"] = datos
                 st.rerun()
-
     else:
         resultado = st.session_state["resultado_actual"]
         datos = st.session_state["datos_actuales"]
         decision = resultado["decision"]
 
         if decision == "APROBADO":
-            st.success("✅ APROBADO - Tu credito ha sido aprobado automaticamente")
+            st.success("✅ APROBADO")
         elif decision == "RECHAZADO":
-            st.error("❌ RECHAZADO - No pudimos aprobar tu solicitud")
+            st.error("❌ RECHAZADO")
         else:
-            st.warning("⏳ EN REVISION - Un analista revisara tu caso")
+            st.warning("⏳ EN REVISION")
 
         if decision == "APROBADO" and not st.session_state.get("credito_creado", False):
             solicitudes = obtener_solicitudes(uid)
             if solicitudes:
                 ultima = solicitudes[0]
-                credito_id = crear_credito(
-                    uid, ultima["id"], resultado["monto_aprobado"],
-                    resultado["tasa_anual"], datos["plazo"],
-                )
+                credito_id = crear_credito(uid, ultima["id"], resultado["monto_aprobado"], resultado["tasa_anual"], datos["plazo"])
                 if credito_id:
                     st.session_state["credito_creado"] = True
                     monto_str = "{:,.0f}".format(resultado["monto_aprobado"]).replace(",", ".")
-                    crear_notificacion(
-                        uid,
-                        "🎉 Credito aprobado",
-                        "Tu credito por $" + monto_str + " fue aprobado y desembolsado.",
-                        "success",
-                    )
-                    st.info("💼 Tu credito fue registrado. Ve a 'Mis creditos' para ver el plan de pagos.")
+                    crear_notificacion(uid, "🎉 Credito aprobado", "Tu credito por $" + monto_str + " fue aprobado.", "success")
+                    st.info("💼 Credito registrado.")
 
-        st.divider()
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Score crediticio", str(resultado["score"]) + "/1000")
+            st.metric("Score", str(resultado["score"]) + "/1000")
         with col2:
-            st.metric("Monto aprobado", "$" + "{:,.0f}".format(resultado["monto_aprobado"]).replace(",", "."))
+            st.metric("Monto", "$" + "{:,.0f}".format(resultado["monto_aprobado"]).replace(",", "."))
         with col3:
-            st.metric("Tasa anual", str(resultado["tasa_anual"]) + "%")
+            st.metric("Tasa", str(resultado["tasa_anual"]) + "%")
 
-        if decision == "APROBADO" and resultado["monto_aprobado"] > 0:
-            plan = calcular_plan_pagos(resultado["monto_aprobado"], resultado["tasa_anual"], datos["plazo"])
-            st.divider()
-            st.subheader("📋 Plan de pagos")
-            col_a, col_b, col_c = st.columns(3)
-            with col_a:
-                st.metric("Cuotas", plan["num_cuotas"])
-            with col_b:
-                st.metric("Valor por cuota", "$" + "{:,.0f}".format(plan["valor_cuota"]).replace(",", "."))
-            with col_c:
-                st.metric("Total a pagar", "$" + "{:,.0f}".format(plan["total_pagar"]).replace(",", "."))
-
-        st.divider()
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=resultado["score"],
-            domain={"x": [0, 1], "y": [0, 1]},
-            title={"text": "Score Crediticio"},
+            title={"text": "Score"},
             gauge={
                 "axis": {"range": [0, 1000]},
                 "bar": {"color": "#0f172a"},
@@ -1435,14 +1909,13 @@ elif menu == "💳 Solicitar credito":
                 ],
             },
         ))
-        fig_gauge.update_layout(height=280, margin=dict(l=20, r=20, t=40, b=20))
+        fig_gauge.update_layout(height=280)
         st.plotly_chart(fig_gauge, use_container_width=True)
 
-        st.subheader("📋 Razones de la decision")
+        st.subheader("📋 Razones")
         for i, razon in enumerate(resultado["razones"], 1):
             st.markdown("**" + str(i) + ".** " + razon)
 
-        st.divider()
         if st.button("🔄 Solicitar otro credito", use_container_width=True):
             st.session_state["resultado_actual"] = None
             st.session_state["datos_actuales"] = None
@@ -1454,12 +1927,11 @@ elif menu == "💳 Solicitar credito":
 
 elif menu == "💼 Mis creditos":
     st.title("💼 Mis creditos")
-    st.caption("Gestiona tus creditos y pagos")
 
     creditos = obtener_todos_creditos(uid)
 
     if not creditos:
-        st.info("No tienes creditos registrados. Ve a 'Solicitar credito' para empezar.")
+        st.info("No tienes creditos registrados.")
     else:
         for cred in creditos:
             icono = "🟢" if cred["estado"] == "activo" else "✅"
@@ -1469,54 +1941,40 @@ elif menu == "💼 Mis creditos":
             with col1:
                 st.metric("Monto", "$" + "{:,.0f}".format(cred["monto_aprobado"]).replace(",", "."))
             with col2:
-                st.metric("Tasa anual", str(cred["tasa_anual"]) + "%")
+                st.metric("Tasa", str(cred["tasa_anual"]) + "%")
             with col3:
-                st.metric("Saldo pendiente", "$" + "{:,.0f}".format(cred["saldo_pendiente"]).replace(",", "."))
+                st.metric("Saldo", "$" + "{:,.0f}".format(cred["saldo_pendiente"]).replace(",", "."))
             with col4:
-                st.metric("Cuotas pagadas", str(cred["cuotas_pagadas"]) + "/" + str(cred["num_cuotas"]))
+                st.metric("Cuotas", str(cred["cuotas_pagadas"]) + "/" + str(cred["num_cuotas"]))
 
-            progreso = cred["cuotas_pagadas"] / cred["num_cuotas"]
-            st.progress(progreso)
+            st.progress(cred["cuotas_pagadas"] / cred["num_cuotas"])
 
             cuotas = obtener_cuotas(cred["id"])
 
-            with st.expander("📋 Ver plan de pagos completo"):
+            with st.expander("📋 Plan de pagos"):
                 filas = []
                 for c in cuotas:
                     filas.append({
                         "N": c["numero"],
                         "Valor": "$" + "{:,.0f}".format(c["valor"]).replace(",", "."),
-                        "Capital": "$" + "{:,.0f}".format(c["capital"]).replace(",", "."),
-                        "Intereses": "$" + "{:,.0f}".format(c["intereses"]).replace(",", "."),
                         "Vencimiento": c["fecha_vencimiento"],
-                        "Estado": "✅ Pagada" if c["estado"] == "pagada" else "⏳ Pendiente",
+                        "Estado": "✅" if c["estado"] == "pagada" else "⏳",
                     })
                 st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
 
             pendientes = [c for c in cuotas if c["estado"] == "pendiente"]
             if pendientes:
                 siguiente = pendientes[0]
-                st.info(
-                    "📅 Proxima cuota: **" + str(siguiente["numero"]) + "** · "
-                    "Vence el " + siguiente["fecha_vencimiento"] + " · "
-                    "Valor: $" + "{:,.0f}".format(siguiente["valor"]).replace(",", ".")
-                )
+                st.info("📅 Proxima cuota: " + str(siguiente["numero"]) + " - Vence " + siguiente["fecha_vencimiento"] + " - $" + "{:,.0f}".format(siguiente["valor"]).replace(",", "."))
                 if st.button("💳 Pagar cuota " + str(siguiente["numero"]), key="pagar_" + str(cred["id"])):
                     if pagar_cuota(siguiente["id"], cred["id"]):
                         valor_str = "{:,.0f}".format(siguiente["valor"]).replace(",", ".")
-                        crear_notificacion(
-                            uid,
-                            "✅ Pago recibido",
-                            "Registramos el pago de tu cuota " + str(siguiente["numero"]) + " por $" + valor_str,
-                            "success",
-                        )
-                        st.success("✅ Cuota pagada correctamente")
+                        crear_notificacion(uid, "✅ Pago recibido", "Pago cuota " + str(siguiente["numero"]) + " por $" + valor_str, "success")
+                        st.success("✅ Pagada")
                         st.balloons()
                         st.rerun()
-                    else:
-                        st.error("No se pudo procesar el pago")
             else:
-                st.success("🎉 Credito pagado completamente")
+                st.success("🎉 Pagado completamente")
 
             st.divider()
 
@@ -1524,19 +1982,16 @@ elif menu == "💼 Mis creditos":
 # ============ CONTRATO ============
 
 elif menu == "📄 Contrato":
-    st.title("📄 Contratos de credito")
-    st.caption("Descarga los contratos de tus creditos aprobados")
+    st.title("📄 Contratos")
 
     creditos = obtener_todos_creditos(uid)
 
     if not creditos:
-        st.info("No tienes creditos para generar contrato.")
+        st.info("No tienes creditos.")
     else:
         cliente = obtener_cliente_demo(email)
-
         for cred in creditos:
             st.subheader("Contrato Credito #" + str(cred["id"]))
-
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("Monto", "$" + "{:,.0f}".format(cred["monto_aprobado"]).replace(",", "."))
@@ -1548,39 +2003,58 @@ elif menu == "📄 Contrato":
             cuotas = obtener_cuotas(cred["id"])
 
             if st.button("📥 Generar contrato PDF", key="pdf_" + str(cred["id"]), type="primary"):
-                with st.spinner("Generando PDF..."):
+                with st.spinner("Generando..."):
                     pdf_bytes = generar_contrato_pdf(cliente, cred, cuotas)
                 if pdf_bytes:
                     st.download_button(
-                        "⬇️ Descargar contrato " + str(cred["id"]) + ".pdf",
+                        "⬇️ Descargar contrato",
                         data=pdf_bytes,
-                        file_name="contrato_flowcredit_" + str(cred["id"]) + ".pdf",
+                        file_name="contrato_" + str(cred["id"]) + ".pdf",
                         mime="application/pdf",
                         key="dl_" + str(cred["id"]),
                     )
-                else:
-                    st.error("No se pudo generar el PDF")
-
             st.divider()
+
+
+# ============ MOVIMIENTOS ============
+
+elif menu == "📋 Movimientos":
+    st.title("📋 Movimientos")
+
+    movs = obtener_movimientos(uid, 200)
+
+    if not movs:
+        st.info("Aun no tienes movimientos.")
+    else:
+        filas = []
+        for m in movs:
+            signo = "+" if m["tipo"] == "ingreso" else "-"
+            monto_fmt = signo + "$" + "{:,.0f}".format(m["monto"]).replace(",", ".")
+            filas.append({
+                "Fecha": (m.get("created_at") or "")[:16].replace("T", " "),
+                "Tipo": "🟢 Ingreso" if m["tipo"] == "ingreso" else "🔴 Egreso",
+                "Descripcion": m["descripcion"],
+                "Monto": monto_fmt,
+            })
+        st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
 
 
 # ============ HISTORIAL ============
 
 elif menu == "📋 Historial":
     st.title("📋 Historial de solicitudes")
-    st.caption("Todas tus solicitudes anteriores")
 
     solicitudes = obtener_solicitudes(uid)
 
     if not solicitudes:
-        st.info("Aun no has realizado ninguna solicitud de credito.")
+        st.info("Aun no hay solicitudes.")
     else:
         filas = []
         for s in solicitudes:
             filas.append({
                 "Fecha": (s.get("created_at") or "")[:10],
-                "Monto solicitado": "$" + "{:,.0f}".format(s["monto_solicitado"]).replace(",", "."),
-                "Monto aprobado": "$" + "{:,.0f}".format(s.get("monto_aprobado") or 0).replace(",", "."),
+                "Solicitado": "$" + "{:,.0f}".format(s["monto_solicitado"]).replace(",", "."),
+                "Aprobado": "$" + "{:,.0f}".format(s.get("monto_aprobado") or 0).replace(",", "."),
                 "Score": s.get("score", 0),
                 "Decision": s.get("decision", ""),
                 "Tasa": str(s.get("tasa_sugerida", 0)) + "%",
@@ -1592,7 +2066,6 @@ elif menu == "📋 Historial":
 
 elif menu.startswith("🔔"):
     st.title("🔔 Notificaciones")
-    st.caption("Todas las alertas de tu cuenta")
 
     notifs = obtener_notificaciones(uid)
 
@@ -1601,8 +2074,8 @@ elif menu.startswith("🔔"):
     else:
         no_leidas = sum(1 for n in notifs if not n.get("leida"))
         if no_leidas > 0:
-            st.warning("Tienes " + str(no_leidas) + " notificaciones sin leer")
-            if st.button("✅ Marcar todas como leidas", use_container_width=True):
+            st.warning("Tienes " + str(no_leidas) + " sin leer")
+            if st.button("✅ Marcar todas", use_container_width=True):
                 marcar_todas_leidas(uid)
                 st.rerun()
 
@@ -1610,14 +2083,12 @@ elif menu.startswith("🔔"):
 
         for n in notifs:
             icono = "📬" if not n.get("leida") else "📭"
-
             col_a, col_b = st.columns([5, 1])
             with col_a:
                 titulo_estilo = "**" + n["titulo"] + "**" if not n.get("leida") else n["titulo"]
                 st.markdown(icono + " " + titulo_estilo)
                 st.caption(n["mensaje"])
-                fecha = (n.get("created_at") or "")[:16].replace("T", " ")
-                st.caption("🕒 " + fecha)
+                st.caption("🕒 " + (n.get("created_at") or "")[:16].replace("T", " "))
             with col_b:
                 if not n.get("leida"):
                     if st.button("✓", key="leer_" + str(n["id"])):
@@ -1629,51 +2100,37 @@ elif menu.startswith("🔔"):
 # ============ TERMINOS ============
 
 elif menu == "📜 Terminos":
-    st.title("📜 Terminos y politica de privacidad")
-    st.caption("Documento legal de uso de la plataforma")
+    st.title("📜 Terminos y privacidad")
 
     with st.expander("Terminos de uso", expanded=True):
         st.markdown("""
         **1. Aceptacion**
         Al usar FlowCredit Digital aceptas los presentes terminos.
 
-        **2. Naturaleza del servicio**
-        FlowCredit Digital es un prototipo demostrativo. No presta dinero real.
-        Las decisiones de credito mostradas son simulaciones con fines academicos.
+        **2. Naturaleza**
+        Prototipo demostrativo. No presta dinero real.
 
-        **3. Datos personales**
-        Tratamos tus datos conforme a la Ley 1581 de 2012. Los datos biometricos
-        se almacenan solo como evidencia de verificacion.
+        **3. Datos**
+        Tratamos tus datos conforme a la Ley 1581 de 2012.
 
         **4. Uso de IA**
-        El motor de decision usa modelos de inteligencia artificial. Los resultados
-        pueden variar segun la informacion proporcionada.
+        Motor de decision con inteligencia artificial.
         """)
 
-    with st.expander("Politica de tratamiento de datos"):
+    with st.expander("Politica de datos"):
         st.markdown("""
-        **Responsable:** FlowCredit Digital - Proyecto SENA 2026
+        **Responsable:** FlowCredit Digital - SENA 2026
 
-        **Finalidad:** Analisis de credito y verificacion de identidad.
+        **Datos recolectados:** Nombre, email, datos financieros, foto facial.
 
-        **Datos recolectados:**
-        - Nombre y correo electronico
-        - Documento de identidad (simulado)
-        - Datos financieros declarados
-        - Fotografia de verificacion facial
-
-        **Derechos del titular (Ley 1581):**
-        - Conocer, actualizar y rectificar tus datos
-        - Solicitar prueba de la autorizacion
-        - Revocar la autorizacion
-        - Presentar quejas ante la SIC
+        **Derechos:** Conocer, actualizar, rectificar, revocar.
 
         **Contacto:** privacidad@flowcredit.com
         """)
 
     estado = obtener_estado_onboarding(uid)
     if not estado.get("terminos_aceptados"):
-        if st.button("✅ Acepto los terminos y politica de privacidad", use_container_width=True, type="primary"):
+        if st.button("✅ Acepto los terminos", use_container_width=True, type="primary"):
             if aceptar_terminos(uid):
                 st.success("Terminos aceptados")
                 st.rerun()
