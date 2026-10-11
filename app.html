@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -10,12 +9,12 @@
   <link rel="stylesheet" href="css/app.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
   <div class="app-layout" id="appLayout">
 
-    <!-- SIDEBAR -->
     <aside class="app-sidebar" id="appSidebar">
       <a href="index.html" class="sidebar-brand">Flow<span>Bank</span></a>
 
@@ -80,7 +79,6 @@
       </div>
     </aside>
 
-    <!-- MAIN -->
     <main class="app-main">
 
       <div class="app-header">
@@ -97,6 +95,28 @@
 
     </main>
 
+  </div>
+
+  <!-- CHAT FLOTANTE -->
+  <button class="chat-fab" id="chatFab" onclick="toggleChat()">💬</button>
+
+  <div class="chat-window" id="chatWindow">
+    <div class="chat-header">
+      <div>
+        <div style="font-weight:700;">Soporte FlowBank</div>
+        <div style="font-size:12px; color:#E9D5FF;">En linea</div>
+      </div>
+      <button onclick="toggleChat()" style="background:none; border:none; color:#FFFFFF; cursor:pointer; font-size:22px;">×</button>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-message chat-bot">
+        Hola! Soy tu asistente FlowBank. ¿En que puedo ayudarte?
+      </div>
+    </div>
+    <div class="chat-input-wrapper">
+      <input class="chat-input" id="chatInput" placeholder="Escribe tu pregunta..." onkeypress="if(event.key==='Enter') enviarChat()">
+      <button class="chat-send" onclick="enviarChat()">➤</button>
+    </div>
   </div>
 
   <script src="js/config.js"></script>
