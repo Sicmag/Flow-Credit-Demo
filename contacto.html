@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contacto - FlowBank</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="container nav-inner">
+      <a href="index.html" class="logo">Flow<span>Bank</span></a>
+      <div class="nav-links" id="navLinks">
+        <a href="productos.html">Productos</a>
+        <a href="nosotros.html">Nosotros</a>
+        <a href="contacto.html" class="active">Contacto</a>
+        <a href="ingresar.html" class="btn-primary">Ingresar</a>
+      </div>
+      <button class="menu-toggle" id="menuToggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <header class="page-header">
+    <div class="container">
+      <h1>Estamos para <span class="gradient-text">ayudarte</span></h1>
+      <p>Escribenos y te respondemos en menos de 24 horas</p>
+    </div>
+  </header>
+
+  <section class="section">
+    <div class="container">
+      <div class="contact-grid">
+
+        <div class="contact-info">
+          <h3>Informacion de contacto</h3>
+          <p>Nuestro equipo esta disponible para resolver cualquier duda sobre productos, alianzas o soporte tecnico.</p>
+
+          <div class="contact-item">
+            <div class="contact-icon">📧</div>
+            <div>
+              <strong>Correo electronico</strong>
+              <span>contacto@flowbank.com</span>
+            </div>
+          </div>
+
+          <div class="contact-item">
+            <div class="contact-icon">📱</div>
+            <div>
+              <strong>Telefono</strong>
+              <span>+57 300 555 0000</span>
+            </div>
+          </div>
+
+          <div class="contact-item">
+            <div class="contact-icon">📍</div>
+            <div>
+              <strong>Ubicacion</strong>
+              <span>Barranquilla, Colombia</span>
+            </div>
+          </div>
+
+          <div class="contact-item">
+            <div class="contact-icon">🕐</div>
+            <div>
+              <strong>Horario</strong>
+              <span>Lunes a Viernes, 8:00 - 18:00</span>
+            </div>
+          </div>
+
+          <div style="margin-top:32px; padding-top:24px; border-top:1px solid var(--border);">
+            <h4 style="font-size:16px; font-weight:700; margin-bottom:12px; color:var(--dark);">Alianzas institucionales</h4>
+            <p style="color:var(--text-light); font-size:14px; margin:0;">
+              Colegios, universidades y cooperativas interesadas en integrar FlowBank, escribanos a <strong>alianzas@flowbank.com</strong>
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <form id="contactForm" style="background:#FFFFFF; padding:40px; border-radius:20px; border:1px solid var(--border);">
+            <h3 style="font-size:24px; font-weight:800; margin-bottom:8px; color:var(--dark);">Envianos un mensaje</h3>
+            <p style="color:var(--text-light); margin-bottom:28px; font-size:15px;">Todos los campos son obligatorios</p>
+
+            <div class="form-message" id="formMessage"></div>
+
+            <div class="form-group">
+              <label class="form-label" for="nombre">Nombre completo</label>
+              <input class="form-input" type="text" id="nombre" placeholder="Tu nombre" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="email">Correo electronico</label>
+              <input class="form-input" type="email" id="email" placeholder="tu@correo.com" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="asunto">Asunto</label>
+              <input class="form-input" type="text" id="asunto" placeholder="Sobre que quieres hablar">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="mensaje">Mensaje</label>
+              <textarea class="form-textarea" id="mensaje" placeholder="Cuentanos en detalle como podemos ayudarte" required></textarea>
+            </div>
+
+            <button type="submit" class="btn-primary btn-large" style="width:100%; justify-content:center;">
+              Enviar mensaje
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">Flow<span>Bank</span></div>
+          <p class="footer-desc">Fintech colombiana enfocada en democratizar el acceso al credito para emprendedores digitales de Latinoamerica.</p>
+        </div>
+        <div>
+          <h4>Productos</h4>
+          <a href="productos.html">FlowCredit</a>
+          <a href="productos.html">FlowPay</a>
+          <a href="productos.html">FlowCard</a>
+          <a href="productos.html">FlowSave</a>
+        </div>
+        <div>
+          <h4>Compania</h4>
+          <a href="nosotros.html">Sobre nosotros</a>
+          <a href="contacto.html">Contacto</a>
+          <a href="ingresar.html">Ingresar</a>
+        </div>
+        <div>
+          <h4>Legal</h4>
+          <a href="#">Terminos</a>
+          <a href="#">Privacidad</a>
+          <a href="#">Ley 1581</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        &copy; 2026 FlowBank - Proyecto SENA. Todos los derechos reservados.
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
