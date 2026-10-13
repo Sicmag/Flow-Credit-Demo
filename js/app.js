@@ -104,15 +104,15 @@ async function navegarA(page) {
     switch (page) {
       case 'dashboard': await renderDashboard(); break;
       case 'flowpay': await renderFlowPay(); break;
-      case 'flowcard': if (typeof renderFlowCard === 'function') await renderFlowCard(); else content.innerHTML = '<p>Modulo en construccion</p>'; break;
-      case 'flowsave': if (typeof renderFlowSave === 'function') await renderFlowSave(); else content.innerHTML = '<p>Modulo en construccion</p>'; break;
-      case 'flowinvest': if (typeof renderFlowInvest === 'function') await renderFlowInvest(); else content.innerHTML = '<p>Modulo en construccion</p>'; break;
-      case 'flowshield': if (typeof renderFlowShield === 'function') await renderFlowShield(); else content.innerHTML = '<p>Modulo en construccion</p>'; break;
-      case 'flowbusiness': if (typeof renderFlowBusiness === 'function') await renderFlowBusiness(); else content.innerHTML = '<p>Modulo en construccion</p>'; break;
-      case 'flowanalytics': if (typeof renderFlowAnalytics === 'function') await renderFlowAnalytics(); else content.innerHTML = '<p>Modulo en construccion</p>'; break;
-      case 'creditos': if (typeof renderCreditos === 'function') await renderCreditos(); else content.innerHTML = '<p>Modulo en construccion</p>'; break;
-      case 'verificacion': if (typeof renderVerificacion === 'function') await renderVerificacion(); else content.innerHTML = '<p>Modulo en construccion</p>'; break;
-      case 'notificaciones': if (typeof renderNotificaciones === 'function') await renderNotificaciones(); else content.innerHTML = '<p>Modulo en construccion</p>'; break;
+      case 'flowcard': await renderFlowCard(); break;
+      case 'flowsave': await renderFlowSave(); break;
+      case 'flowinvest': await renderFlowInvest(); break;
+      case 'flowshield': await renderFlowShield(); break;
+      case 'flowbusiness': await renderFlowBusiness(); break;
+      case 'flowanalytics': await renderFlowAnalytics(); break;
+      case 'creditos': await renderCreditos(); break;
+      case 'verificacion': await renderVerificacion(); break;
+      case 'notificaciones': await renderNotificaciones(); break;
       default: content.innerHTML = '<p>Pagina no encontrada</p>';
     }
   } catch (error) {
@@ -240,7 +240,7 @@ async function renderFlowPay() {
   const userIdActual = localStorage.getItem('user_id');
 
   const { data: perfil } = await supabaseClient.from('profiles').select('es_admin').eq('id', userIdActual).single();
-  const esAdmin = perfil?.es_admin === true;
+  const esAdmin = perfil && perfil.es_admin === true;
 
   const { data: usuarios } = await supabaseClient.from('usuarios_registrados').select('*');
   const otros = (usuarios || []).filter(u => u.user_id !== userIdActual);
@@ -276,12 +276,7 @@ async function renderFlowPay() {
       </div>
     </div>
 
-    ${esAdmin ? `
-      <div class="alert alert-warning">
-        <strong>👑 Panel de Administrador</strong><br>
-        Tienes ${codigosPendientes.length} codigos de retiro pendientes de validar.
-      </div>
-    ` : ''}
+    ${esAdmin ? '<div class="alert alert-warning"><strong>👑 Panel de Administrador</strong><br>Tienes ' + codigosPendientes.length + ' codigos de retiro pendientes.</div>' : ''}
 
     <div class="app-tabs">
       <button class="app-tab active" data-tab="enviar">Enviar</button>
@@ -299,7 +294,7 @@ async function renderFlowPay() {
           <label class="app-form-label">Destinatario</label>
           <select class="app-form-select" id="payReceptor">
             <option value="">Selecciona un destinatario</option>
-            ${otros.map(u => `<option value="${u.email}">${u.email}</option>`).join('')}
+            ${otros.map(u => '<option value="' + u.email + '">' + u.email + '</option>').join('')}
           </select>
         </div>
         <div class="app-form-group">
@@ -318,7 +313,7 @@ async function renderFlowPay() {
     <div class="app-tab-content" id="tab-recargar">
       <div class="app-section">
         <div class="app-section-title">Recargar saldo</div>
-        <p style="color:#64748B; margin-bottom:16px;">Simula una recarga desde banco externo a tu cuenta FlowBank.</p>
+        <p style="color:#64748B; margin-bottom:16px;">Simula una recarga desde banco externo.</p>
         <div class="app-form-group">
           <label class="app-form-label">Monto a recargar (COP)</label>
           <input class="app-form-input" type="number" id="recargarMonto" min="10000" value="100000">
@@ -339,21 +334,13 @@ async function renderFlowPay() {
         <div id="retiroMessage"></div>
         <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="generarCodigoRetiro()">Generar codigo de retiro</button>
       </div>
-
       <div class="app-section">
         <div class="app-section-title">Mis codigos de retiro</div>
         ${misCodigos && misCodigos.length > 0 ? `
           <table class="app-table">
             <thead><tr><th>Codigo</th><th>Monto</th><th>Estado</th><th>Fecha</th></tr></thead>
             <tbody>
-              ${misCodigos.map(c => `
-                <tr>
-                  <td style="font-family:monospace; font-weight:700; color:#820AD1;">${c.codigo}</td>
-                  <td>${formatearDinero(c.monto)}</td>
-                  <td><span class="badge ${c.estado === 'pendiente' ? 'badge-yellow' : 'badge-green'}">${c.estado}</span></td>
-                  <td>${formatearFechaCorta(c.created_at)}</td>
-                </tr>
-              `).join('')}
+              ${misCodigos.map(c => '<tr><td style="font-family:monospace;font-weight:700;color:#820AD1;">' + c.codigo + '</td><td>' + formatearDinero(c.monto) + '</td><td><span class="badge ' + (c.estado === 'pendiente' ? 'badge-yellow' : 'badge-green') + '">' + c.estado + '</span></td><td>' + formatearFechaCorta(c.created_at) + '</td></tr>').join('')}
             </tbody>
           </table>
         ` : '<p style="color:#64748B;">No has generado codigos de retiro.</p>'}
@@ -388,20 +375,11 @@ async function renderFlowPay() {
       <div class="app-tab-content" id="tab-admin-codigos">
         <div class="app-section">
           <div class="app-section-title">👑 Codigos pendientes de validar</div>
-          <p style="color:#64748B; margin-bottom:16px;">Entrega el efectivo al cliente y marca el codigo como usado.</p>
           ${codigosPendientes && codigosPendientes.length > 0 ? `
             <table class="app-table">
-              <thead><tr><th>Codigo</th><th>Cliente</th><th>Monto</th><th>Fecha</th><th></th></tr></thead>
+              <thead><tr><th>Codigo</th><th>Cliente</th><th>Monto</th><th></th></tr></thead>
               <tbody>
-                ${codigosPendientes.map(c => `
-                  <tr>
-                    <td style="font-family:monospace; font-weight:700; color:#820AD1;">${c.codigo}</td>
-                    <td>${c.cliente_email}<br><small style="color:#64748B;">${c.cliente_nombre || ''}</small></td>
-                    <td style="font-weight:700;">${formatearDinero(c.monto)}</td>
-                    <td>${formatearFechaCorta(c.created_at)}</td>
-                    <td><button class="btn-primary" style="font-size:12px; padding:6px 12px;" onclick="validarCodigo(${c.id}, '${c.codigo}')">✅ Validar</button></td>
-                  </tr>
-                `).join('')}
+                ${codigosPendientes.map(c => '<tr><td style="font-family:monospace;font-weight:700;color:#820AD1;">' + c.codigo + '</td><td>' + c.cliente_email + '</td><td style="font-weight:700;">' + formatearDinero(c.monto) + '</td><td><button class="btn-primary" style="font-size:12px;padding:6px 12px;" onclick="validarCodigo(' + c.id + ', \'' + c.codigo + '\')">✅ Validar</button></td></tr>').join('')}
               </tbody>
             </table>
           ` : '<p style="color:#64748B;">No hay codigos pendientes.</p>'}
@@ -421,7 +399,7 @@ async function renderFlowPay() {
                 const signo = esEmisor ? '-' : '+';
                 const clase = esEmisor ? 'text-red' : 'text-green';
                 const contraparte = esEmisor ? t.receptor_email : t.emisor_email;
-                return `<tr><td>${formatearFecha(t.created_at)}</td><td>${esEmisor ? '📤' : '📥'}</td><td>${contraparte}</td><td class="${clase}" style="text-align:right;">${signo}${formatearDinero(t.monto)}</td><td><button class="btn-secondary-sm" onclick="generarReciboPDF(${t.id})" style="font-size:11px; padding:4px 8px;">📄</button></td></tr>`;
+                return '<tr><td>' + formatearFecha(t.created_at) + '</td><td>' + (esEmisor ? '📤' : '📥') + '</td><td>' + contraparte + '</td><td class="' + clase + '" style="text-align:right;">' + signo + formatearDinero(t.monto) + '</td><td><button class="btn-secondary-sm" onclick="generarReciboPDF(' + t.id + ')" style="font-size:11px;padding:4px 8px;">📄</button></td></tr>';
               }).join('')}
             </tbody>
           </table>
@@ -433,8 +411,6 @@ async function renderFlowPay() {
   document.getElementById('pageContent').innerHTML = html;
   activarTabs();
 }
-
-// ============ FUNCIONES FLOWPAY ============
 
 function activarTabs() {
   document.querySelectorAll('.app-tab').forEach(tab => {
@@ -477,7 +453,6 @@ async function enviarDinero() {
       await crearNotificacion(receptorInfo.user_id, '💸 Dinero recibido', 'Recibiste ' + formatearDinero(monto) + ' de ' + localStorage.getItem('user_email'), 'success');
     }
     await crearNotificacion(localStorage.getItem('user_id'), '✅ Transferencia enviada', 'Enviaste ' + formatearDinero(monto) + ' a ' + receptor, 'success');
-
     msg.innerHTML = mostrarAlerta('✅ Transferencia exitosa', 'success');
     await actualizarSaldoSidebar();
     setTimeout(() => navegarA('flowpay'), 1500);
@@ -495,7 +470,7 @@ async function recargarSaldo() {
   }
   const { data } = await supabaseClient.rpc('recargar_saldo', { p_monto: monto });
   if (data && data.success) {
-    await crearNotificacion(localStorage.getItem('user_id'), '💰 Recarga exitosa', 'Recargaste ' + formatearDinero(monto) + ' a tu cuenta', 'success');
+    await crearNotificacion(localStorage.getItem('user_id'), '💰 Recarga exitosa', 'Recargaste ' + formatearDinero(monto), 'success');
     msg.innerHTML = mostrarAlerta('✅ Recarga exitosa', 'success');
     await actualizarSaldoSidebar();
     setTimeout(() => navegarA('flowpay'), 1500);
@@ -526,19 +501,15 @@ async function pagarServicio() {
 async function generarCodigoRetiro() {
   const monto = parseFloat(document.getElementById('retiroMonto').value);
   const msg = document.getElementById('retiroMessage');
-
   if (!monto || monto < 10000) {
     msg.innerHTML = mostrarAlerta('Monto minimo: $10.000 COP', 'error');
     return;
   }
-
   msg.innerHTML = '<div class="alert alert-info">Generando codigo...</div>';
-
   const { data } = await supabaseClient.rpc('generar_codigo_retiro', { p_monto: monto });
-
   if (data && data.success) {
-    await crearNotificacion(localStorage.getItem('user_id'), '🎫 Codigo de retiro generado', 'Codigo: ' + data.codigo + ' por ' + formatearDinero(monto), 'info');
-    msg.innerHTML = mostrarAlerta('✅ Codigo generado: <strong style="font-family:monospace;">' + data.codigo + '</strong><br>Guardalo y presentalo en un punto autorizado.', 'success');
+    await crearNotificacion(localStorage.getItem('user_id'), '🎫 Codigo generado', 'Codigo: ' + data.codigo + ' por ' + formatearDinero(monto), 'info');
+    msg.innerHTML = mostrarAlerta('✅ Codigo: <strong style="font-family:monospace;">' + data.codigo + '</strong>', 'success');
     await actualizarSaldoSidebar();
     setTimeout(() => navegarA('flowpay'), 3000);
   } else {
@@ -547,78 +518,43 @@ async function generarCodigoRetiro() {
 }
 
 async function validarCodigo(codigoId, codigo) {
-  if (!confirm('¿Confirmas que entregaste el efectivo al cliente?\n\nCodigo: ' + codigo)) {
-    return;
-  }
-
+  if (!confirm('¿Confirmas que entregaste el efectivo?\n\nCodigo: ' + codigo)) return;
   const userId = localStorage.getItem('user_id');
   const { error } = await supabaseClient.from('codigos_retiro').update({
-    estado: 'usado',
-    usado_at: new Date().toISOString(),
-    usado_por: userId,
+    estado: 'usado', usado_at: new Date().toISOString(), usado_por: userId,
   }).eq('id', codigoId);
-
-  if (error) {
-    alert('Error: ' + error.message);
-    return;
-  }
-
-  await crearNotificacion(userId, '✅ Codigo validado', 'Validaste el codigo ' + codigo + ' correctamente', 'success');
-  alert('✅ Codigo validado exitosamente');
+  if (error) { alert('Error: ' + error.message); return; }
+  await crearNotificacion(userId, '✅ Codigo validado', 'Validaste el codigo ' + codigo, 'success');
+  alert('✅ Codigo validado');
   navegarA('flowpay');
 }
 
 async function generarReciboPDF(transferenciaId) {
   const { data: t } = await supabaseClient.from('transferencias').select('*').eq('id', transferenciaId).single();
   if (!t) { alert('Transferencia no encontrada'); return; }
-
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(130, 10, 209);
   doc.text('FLOWBANK', 105, 30, { align: 'center' });
-
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
   doc.setFont('helvetica', 'normal');
   doc.text('Comprobante de Transferencia', 105, 38, { align: 'center' });
-
   doc.setDrawColor(130, 10, 209);
   doc.setLineWidth(0.8);
   doc.line(20, 44, 190, 44);
-
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(15, 23, 42);
-  doc.text('Detalles de la operacion', 20, 60);
-
   doc.setFontSize(11);
-  doc.setFont('helvetica', 'normal');
   doc.setTextColor(51, 65, 85);
-  doc.text('Numero: #' + t.id, 20, 75);
-  doc.text('Fecha: ' + formatearFecha(t.created_at), 20, 85);
-  doc.text('Emisor: ' + t.emisor_email, 20, 95);
-  doc.text('Receptor: ' + t.receptor_email, 20, 105);
-  doc.text('Monto: ' + formatearDinero(t.monto) + ' COP', 20, 115);
-  doc.text('Concepto: ' + (t.concepto || 'Sin concepto'), 20, 125);
-
-  doc.setFontSize(9);
-  doc.setTextColor(148, 163, 184);
-  doc.text('Comprobante digital generado por FlowBank.', 105, 260, { align: 'center' });
-  doc.text('Proyecto SENA 2026', 105, 266, { align: 'center' });
-
+  doc.text('Numero: #' + t.id, 20, 60);
+  doc.text('Fecha: ' + formatearFecha(t.created_at), 20, 70);
+  doc.text('Emisor: ' + t.emisor_email, 20, 80);
+  doc.text('Receptor: ' + t.receptor_email, 20, 90);
+  doc.text('Monto: ' + formatearDinero(t.monto) + ' COP', 20, 100);
+  doc.text('Concepto: ' + (t.concepto || 'Sin concepto'), 20, 110);
   doc.save('recibo_flowbank_' + t.id + '.pdf');
 }
-
-// ============ FIN PARTE 1 ============
-// ⬇️ AQUI CONTINUA LA PARTE 2 ⬇️
-
-
-// ============================================================
-// FlowBank - App Principal (SPA) - Parte 2/2
-// ============================================================
 
 // ============ FLOWCARD ============
 
@@ -631,10 +567,8 @@ async function renderFlowCard() {
     const cvv = String(Math.floor(100 + Math.random() * 900));
     const mes = String(Math.floor(1 + Math.random() * 12)).padStart(2, '0');
     const anio = String(new Date().getFullYear() + 4).slice(-2);
-    const fecha = mes + '/' + anio;
-
     const { data } = await supabaseClient.from('tarjetas').insert({
-      user_id: userId, numero, cvv, fecha_expiracion: fecha, cupo_total: 3000000, cupo_disponible: 3000000
+      user_id: userId, numero, cvv, fecha_expiracion: mes + '/' + anio, cupo_total: 3000000, cupo_disponible: 3000000
     }).select().single();
     tarjeta = data;
   }
@@ -663,24 +597,15 @@ async function renderFlowCard() {
 
     <div style="max-width:420px; margin:0 auto;">
       <div class="metrics-grid" style="grid-template-columns:1fr 1fr;">
-        <div class="metric-card">
-          <div class="metric-label">Cupo total</div>
-          <div class="metric-value">${formatearDinero(tarjeta.cupo_total)}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Cupo disponible</div>
-          <div class="metric-value" style="color:#10B981;">${formatearDinero(tarjeta.cupo_disponible)}</div>
-        </div>
-        <div class="metric-card" style="grid-column: span 2; ${deuda > 0 ? 'border-color:#EF4444; border-width:2px;' : ''}">
-          <div class="metric-label">Deuda actual</div>
-          <div class="metric-value" style="color:${deuda > 0 ? '#EF4444' : '#10B981'};">${formatearDinero(deuda)}</div>
-        </div>
+        <div class="metric-card"><div class="metric-label">Cupo total</div><div class="metric-value">${formatearDinero(tarjeta.cupo_total)}</div></div>
+        <div class="metric-card"><div class="metric-label">Cupo disponible</div><div class="metric-value" style="color:#10B981;">${formatearDinero(tarjeta.cupo_disponible)}</div></div>
+        <div class="metric-card" style="grid-column:span 2;"><div class="metric-label">Deuda actual</div><div class="metric-value" style="color:${deuda > 0 ? '#EF4444' : '#10B981'};">${formatearDinero(deuda)}</div></div>
       </div>
 
       <div class="app-section">
         <div class="app-section-title">Estado: ${tarjeta.estado === 'activa' ? '🟢 Activa' : '🔒 Congelada'}</div>
-        <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="toggleTarjeta(${tarjeta.id}, '${tarjeta.estado}')">
-          ${tarjeta.estado === 'activa' ? '🔒 Congelar tarjeta' : '🔓 Descongelar tarjeta'}
+        <button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="toggleTarjeta(${tarjeta.id}, '${tarjeta.estado}')">
+          ${tarjeta.estado === 'activa' ? '🔒 Congelar' : '🔓 Descongelar'}
         </button>
       </div>
 
@@ -692,32 +617,26 @@ async function renderFlowCard() {
       <div class="app-tab-content active" id="tab-sacar-cupo">
         <div class="app-section">
           <div class="app-section-title">Sacar cupo a tu cuenta</div>
-          <p style="color:#64748B; margin-bottom:16px;">Retira dinero de tu cupo disponible hacia tu saldo principal.</p>
+          <p style="color:#64748B;margin-bottom:16px;">Retira dinero de tu cupo hacia tu saldo principal.</p>
           <div class="app-form-group">
             <label class="app-form-label">Monto a retirar (COP)</label>
-            <input class="app-form-input" type="number" id="montoSacarCupo" min="10000" max="${tarjeta.cupo_disponible}" value="100000">
-            <small style="color:#64748B; font-size:12px;">Cupo disponible: ${formatearDinero(tarjeta.cupo_disponible)}</small>
+            <input class="app-form-input" type="number" id="montoSacarCupo" min="10000" value="100000">
           </div>
           <div id="sacarCupoMessage"></div>
-          <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="sacarCupo()" ${tarjeta.cupo_disponible <= 0 ? 'disabled' : ''}>
-            💸 Sacar cupo
-          </button>
+          <button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="sacarCupo()">💸 Sacar cupo</button>
         </div>
       </div>
 
       <div class="app-tab-content" id="tab-pagar-tarjeta">
         <div class="app-section">
           <div class="app-section-title">Pagar tarjeta</div>
-          <p style="color:#64748B; margin-bottom:16px;">Paga tu deuda para recuperar cupo disponible.</p>
+          <p style="color:#64748B;margin-bottom:16px;">Paga tu deuda para recuperar cupo.</p>
           <div class="app-form-group">
             <label class="app-form-label">Monto a pagar (COP)</label>
             <input class="app-form-input" type="number" id="montoPagarTarjeta" min="1000" value="${deuda > 0 ? Math.min(deuda, 100000) : 0}">
-            <small style="color:#64748B; font-size:12px;">Deuda actual: ${formatearDinero(deuda)}</small>
           </div>
           <div id="pagarTarjetaMessage"></div>
-          <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="pagarTarjeta()" ${deuda <= 0 ? 'disabled' : ''}>
-            💳 Pagar tarjeta
-          </button>
+          <button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="pagarTarjeta()">💳 Pagar tarjeta</button>
         </div>
       </div>
     </div>
@@ -736,19 +655,15 @@ async function toggleTarjeta(id, estadoActual) {
 async function sacarCupo() {
   const monto = parseFloat(document.getElementById('montoSacarCupo').value);
   const msg = document.getElementById('sacarCupoMessage');
-
   if (!monto || monto < 10000) {
-    msg.innerHTML = mostrarAlerta('Monto minimo: $10.000 COP', 'error');
+    msg.innerHTML = mostrarAlerta('Monto minimo: $10.000', 'error');
     return;
   }
-
   msg.innerHTML = '<div class="alert alert-info">Procesando...</div>';
-
   const { data } = await supabaseClient.rpc('usar_cupo_tarjeta', { p_monto: monto });
-
   if (data && data.success) {
-    await crearNotificacion(localStorage.getItem('user_id'), '💸 Avance de cupo', 'Retiraste ' + formatearDinero(monto) + ' de tu FlowCard', 'success');
-    msg.innerHTML = mostrarAlerta('✅ Cupo retirado correctamente', 'success');
+    await crearNotificacion(localStorage.getItem('user_id'), '💸 Avance de cupo', 'Retiraste ' + formatearDinero(monto), 'success');
+    msg.innerHTML = mostrarAlerta('✅ Cupo retirado', 'success');
     await actualizarSaldoSidebar();
     setTimeout(() => navegarA('flowcard'), 1500);
   } else {
@@ -759,19 +674,15 @@ async function sacarCupo() {
 async function pagarTarjeta() {
   const monto = parseFloat(document.getElementById('montoPagarTarjeta').value);
   const msg = document.getElementById('pagarTarjetaMessage');
-
   if (!monto || monto <= 0) {
     msg.innerHTML = mostrarAlerta('Monto invalido', 'error');
     return;
   }
-
   msg.innerHTML = '<div class="alert alert-info">Procesando...</div>';
-
   const { data } = await supabaseClient.rpc('pagar_tarjeta', { p_monto: monto });
-
   if (data && data.success) {
     const pagoReal = data.pago_real || monto;
-    await crearNotificacion(localStorage.getItem('user_id'), '💳 Pago de tarjeta', 'Pagaste ' + formatearDinero(pagoReal) + ' a tu FlowCard', 'success');
+    await crearNotificacion(localStorage.getItem('user_id'), '💳 Pago de tarjeta', 'Pagaste ' + formatearDinero(pagoReal), 'success');
     msg.innerHTML = mostrarAlerta('✅ Pago realizado: ' + formatearDinero(pagoReal), 'success');
     await actualizarSaldoSidebar();
     setTimeout(() => navegarA('flowcard'), 1500);
@@ -780,78 +691,43 @@ async function pagarTarjeta() {
   }
 }
 
+// ⬇️ AQUI CONTINUA LA PARTE 2 ⬇️
+
+
+// ============================================================
+// FlowBank - App Principal (SPA) - Parte 2/2
+// ============================================================
+
 // ============ FLOWSAVE ============
 
 async function renderFlowSave() {
   const userId = localStorage.getItem('user_id');
   const { data: metas } = await supabaseClient.from('metas_ahorro').select('*').eq('user_id', userId).order('created_at', { ascending: false });
 
-  let html = `
-    <div class="app-tabs">
-      <button class="app-tab active" data-tab="mis-metas">Mis metas</button>
-      <button class="app-tab" data-tab="nueva-meta">Nueva meta</button>
-    </div>
-    <div class="app-tab-content active" id="tab-mis-metas">
-  `;
+  let html = '<div class="app-tabs"><button class="app-tab active" data-tab="mis-metas">Mis metas</button><button class="app-tab" data-tab="nueva-meta">Nueva meta</button></div><div class="app-tab-content active" id="tab-mis-metas">';
 
   if (metas && metas.length > 0) {
     metas.forEach(meta => {
       const progreso = meta.monto_objetivo > 0 ? (meta.monto_actual / meta.monto_objetivo) * 100 : 0;
-      html += `
-        <div class="meta-card">
-          <div class="meta-header">
-            <div class="meta-nombre">${meta.icono || '🎯'} ${meta.nombre}</div>
-            <div class="badge badge-purple">${progreso.toFixed(1)}%</div>
-          </div>
-          <div style="display:flex; justify-content:space-between; font-size:14px; color:#64748B;">
-            <span>Ahorrado: <strong>${formatearDinero(meta.monto_actual)}</strong></span>
-            <span>Meta: <strong>${formatearDinero(meta.monto_objetivo)}</strong></span>
-          </div>
-          <div class="meta-progress-bar"><div class="meta-progress-fill" style="width:${Math.min(progreso, 100)}%"></div></div>
-          <div style="display:flex; gap:8px; margin-top:12px;">
-            <input class="app-form-input" type="number" id="aporte-${meta.id}" placeholder="Monto a aportar" style="flex:1;">
-            <button class="btn-primary" onclick="aportarMeta(${meta.id})">Aportar</button>
-          </div>
-        </div>
-      `;
+      html += '<div class="meta-card">' +
+        '<div class="meta-header"><div class="meta-nombre">' + (meta.icono || '🎯') + ' ' + meta.nombre + '</div><div class="badge badge-purple">' + progreso.toFixed(1) + '%</div></div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:14px;color:#64748B;"><span>Ahorrado: <strong>' + formatearDinero(meta.monto_actual) + '</strong></span><span>Meta: <strong>' + formatearDinero(meta.monto_objetivo) + '</strong></span></div>' +
+        '<div class="meta-progress-bar"><div class="meta-progress-fill" style="width:' + Math.min(progreso, 100) + '%"></div></div>' +
+        '<div style="display:flex;gap:8px;margin-top:12px;"><input class="app-form-input" type="number" id="aporte-' + meta.id + '" placeholder="Aportar" style="flex:1;"><button class="btn-primary" onclick="aportarMeta(' + meta.id + ')">Aportar</button></div>' +
+        '</div>';
     });
   } else {
-    html += '<div class="app-section"><p style="color:#64748B;">Aun no tienes metas de ahorro.</p></div>';
+    html += '<div class="app-section"><p style="color:#64748B;">Aun no tienes metas.</p></div>';
   }
 
-  html += `
-    </div>
-    <div class="app-tab-content" id="tab-nueva-meta">
-      <div class="app-section">
-        <div class="app-section-title">Crear nueva meta</div>
-        <div class="app-form-group">
-          <label class="app-form-label">Nombre de la meta</label>
-          <input class="app-form-input" type="text" id="metaNombre" placeholder="Ej: Viaje a Cartagena">
-        </div>
-        <div class="app-form-group">
-          <label class="app-form-label">Monto objetivo (COP)</label>
-          <input class="app-form-input" type="number" id="metaObjetivo" value="500000">
-        </div>
-        <div class="app-form-group">
-          <label class="app-form-label">Fecha limite</label>
-          <input class="app-form-input" type="date" id="metaFecha">
-        </div>
-        <div class="app-form-group">
-          <label class="app-form-label">Icono</label>
-          <select class="app-form-select" id="metaIcono">
-            <option value="🎯">🎯 Meta</option>
-            <option value="✈️">✈️ Viaje</option>
-            <option value="🏠">🏠 Casa</option>
-            <option value="🚗">🚗 Auto</option>
-            <option value="💻">💻 Tecnologia</option>
-            <option value="🎓">🎓 Educacion</option>
-          </select>
-        </div>
-        <div id="metaMessage"></div>
-        <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="crearMeta()">Crear meta</button>
-      </div>
-    </div>
-  `;
+  html += '</div><div class="app-tab-content" id="tab-nueva-meta"><div class="app-section"><div class="app-section-title">Crear meta</div>' +
+    '<div class="app-form-group"><label class="app-form-label">Nombre</label><input class="app-form-input" type="text" id="metaNombre"></div>' +
+    '<div class="app-form-group"><label class="app-form-label">Monto objetivo (COP)</label><input class="app-form-input" type="number" id="metaObjetivo" value="500000"></div>' +
+    '<div class="app-form-group"><label class="app-form-label">Fecha limite</label><input class="app-form-input" type="date" id="metaFecha"></div>' +
+    '<div class="app-form-group"><label class="app-form-label">Icono</label><select class="app-form-select" id="metaIcono"><option value="🎯">🎯 Meta</option><option value="✈️">✈️ Viaje</option><option value="🏠">🏠 Casa</option><option value="🚗">🚗 Auto</option><option value="💻">💻 Tecnologia</option><option value="🎓">🎓 Educacion</option></select></div>' +
+    '<div id="metaMessage"></div>' +
+    '<button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="crearMeta()">Crear meta</button>' +
+    '</div></div>';
 
   document.getElementById('pageContent').innerHTML = html;
   activarTabs();
@@ -863,16 +739,8 @@ async function crearMeta() {
   const objetivo = parseFloat(document.getElementById('metaObjetivo').value);
   const fecha = document.getElementById('metaFecha').value || null;
   const icono = document.getElementById('metaIcono').value;
-  const msg = document.getElementById('metaMessage');
-
-  if (!nombre || !objetivo) {
-    msg.innerHTML = mostrarAlerta('Completa todos los campos', 'error');
-    return;
-  }
-
-  await supabaseClient.from('metas_ahorro').insert({
-    user_id: userId, nombre, monto_objetivo: objetivo, fecha_limite: fecha, icono
-  });
+  if (!nombre || !objetivo) { alert('Completa los campos'); return; }
+  await supabaseClient.from('metas_ahorro').insert({ user_id: userId, nombre, monto_objetivo: objetivo, fecha_limite: fecha, icono });
   navegarA('flowsave');
 }
 
@@ -880,10 +748,8 @@ async function aportarMeta(metaId) {
   const input = document.getElementById('aporte-' + metaId);
   const monto = parseFloat(input.value);
   if (!monto || monto <= 0) return;
-
   const { data } = await supabaseClient.from('metas_ahorro').select('monto_actual').eq('id', metaId).single();
   const actual = data ? Number(data.monto_actual) : 0;
-
   await supabaseClient.from('metas_ahorro').update({ monto_actual: actual + monto }).eq('id', metaId);
   navegarA('flowsave');
 }
@@ -895,76 +761,48 @@ async function renderFlowInvest() {
   const { data: inversiones } = await supabaseClient.from('inversiones').select('*').eq('user_id', userId).order('created_at', { ascending: false });
 
   const productos = [
-    { nombre: 'CDT Digital', rendimiento: 10.5, desc: 'Bajo riesgo, plazo 90 dias' },
-    { nombre: 'Fondo Conservador', rendimiento: 12.0, desc: 'Riesgo medio, liquidez inmediata' },
-    { nombre: 'Fondo Crecimiento', rendimiento: 15.5, desc: 'Riesgo alto, plazo 1 ano' },
-    { nombre: 'Portafolio Emprendedor', rendimiento: 18.0, desc: 'Diversificado, riesgo alto' },
+    { nombre: 'CDT Digital', rendimiento: 10.5, desc: 'Bajo riesgo' },
+    { nombre: 'Fondo Conservador', rendimiento: 12.0, desc: 'Riesgo medio' },
+    { nombre: 'Fondo Crecimiento', rendimiento: 15.5, desc: 'Riesgo alto' },
+    { nombre: 'Portafolio Emprendedor', rendimiento: 18.0, desc: 'Diversificado' },
   ];
 
   let totalInv = 0, totalAct = 0;
-  if (inversiones) {
-    inversiones.forEach(i => { totalInv += Number(i.monto_invertido); totalAct += Number(i.valor_actual); });
-  }
+  if (inversiones) inversiones.forEach(i => { totalInv += Number(i.monto_invertido); totalAct += Number(i.valor_actual); });
 
-  let html = `
-    <div class="metrics-grid">
-      <div class="metric-card"><div class="metric-label">Total invertido</div><div class="metric-value">${formatearDinero(totalInv)}</div></div>
-      <div class="metric-card"><div class="metric-label">Valor actual</div><div class="metric-value">${formatearDinero(totalAct)}</div></div>
-      <div class="metric-card"><div class="metric-label">Rendimiento</div><div class="metric-value text-green">${formatearDinero(totalAct - totalInv)}</div></div>
-    </div>
+  let html = '<div class="metrics-grid">' +
+    '<div class="metric-card"><div class="metric-label">Total invertido</div><div class="metric-value">' + formatearDinero(totalInv) + '</div></div>' +
+    '<div class="metric-card"><div class="metric-label">Valor actual</div><div class="metric-value">' + formatearDinero(totalAct) + '</div></div>' +
+    '<div class="metric-card"><div class="metric-label">Rendimiento</div><div class="metric-value text-green">' + formatearDinero(totalAct - totalInv) + '</div></div>' +
+    '</div>';
 
-    <div class="app-tabs">
-      <button class="app-tab active" data-tab="mis-inv">Mis inversiones</button>
-      <button class="app-tab" data-tab="nueva-inv">Invertir</button>
-    </div>
-    <div class="app-tab-content active" id="tab-mis-inv">
-  `;
+  html += '<div class="app-tabs"><button class="app-tab active" data-tab="mis-inv">Mis inversiones</button><button class="app-tab" data-tab="nueva-inv">Invertir</button></div><div class="app-tab-content active" id="tab-mis-inv">';
 
   if (inversiones && inversiones.length > 0) {
     inversiones.forEach(inv => {
-      html += `
-        <div class="product-item">
-          <div class="product-item-info">
-            <h4>${inv.producto}</h4>
-            <p>Rendimiento anual: ${inv.rendimiento_anual}%</p>
-          </div>
-          <div class="product-item-price">${formatearDinero(inv.monto_invertido)}</div>
-        </div>
-      `;
+      html += '<div class="product-item"><div class="product-item-info"><h4>' + inv.producto + '</h4><p>Rendimiento anual: ' + inv.rendimiento_anual + '%</p></div><div class="product-item-price">' + formatearDinero(inv.monto_invertido) + '</div></div>';
     });
   } else {
-    html += '<div class="app-section"><p style="color:#64748B;">Aun no tienes inversiones activas.</p></div>';
+    html += '<div class="app-section"><p style="color:#64748B;">Aun no tienes inversiones.</p></div>';
   }
 
-  html += `
-    </div>
-    <div class="app-tab-content" id="tab-nueva-inv">
-      <div class="app-section">
-        <div class="app-section-title">Productos disponibles</div>
-        ${productos.map(p => `
-          <div class="product-item">
-            <div class="product-item-info"><h4>${p.nombre}</h4><p>${p.desc}</p></div>
-            <div class="product-item-price">${p.rendimiento}%</div>
-          </div>
-        `).join('')}
-      </div>
-      <div class="app-section">
-        <div class="app-section-title">Nueva inversion</div>
-        <div class="app-form-group">
-          <label class="app-form-label">Producto</label>
-          <select class="app-form-select" id="invProducto">
-            ${productos.map(p => `<option value="${p.nombre}" data-rend="${p.rendimiento}">${p.nombre} - ${p.rendimiento}%</option>`).join('')}
-          </select>
-        </div>
-        <div class="app-form-group">
-          <label class="app-form-label">Monto (COP)</label>
-          <input class="app-form-input" type="number" id="invMonto" value="100000" min="100000">
-        </div>
-        <div id="invMessage"></div>
-        <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="crearInversion()">Invertir</button>
-      </div>
-    </div>
-  `;
+  html += '</div><div class="app-tab-content" id="tab-nueva-inv"><div class="app-section"><div class="app-section-title">Productos</div>';
+
+  productos.forEach(p => {
+    html += '<div class="product-item"><div class="product-item-info"><h4>' + p.nombre + '</h4><p>' + p.desc + '</p></div><div class="product-item-price">' + p.rendimiento + '%</div></div>';
+  });
+
+  html += '</div><div class="app-section"><div class="app-section-title">Nueva inversion</div>' +
+    '<div class="app-form-group"><label class="app-form-label">Producto</label><select class="app-form-select" id="invProducto">';
+
+  productos.forEach(p => {
+    html += '<option value="' + p.nombre + '" data-rend="' + p.rendimiento + '">' + p.nombre + ' - ' + p.rendimiento + '%</option>';
+  });
+
+  html += '</select></div>' +
+    '<div class="app-form-group"><label class="app-form-label">Monto (COP)</label><input class="app-form-input" type="number" id="invMonto" value="100000"></div>' +
+    '<div id="invMessage"></div>' +
+    '<button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="crearInversion()">Invertir</button></div></div>';
 
   document.getElementById('pageContent').innerHTML = html;
   activarTabs();
@@ -977,22 +815,10 @@ async function crearInversion() {
   const rend = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-rend'));
   const monto = parseFloat(document.getElementById('invMonto').value);
   const msg = document.getElementById('invMessage');
-
-  if (!monto || monto < 100000) {
-    msg.innerHTML = mostrarAlerta('Minimo $100.000 COP', 'error');
-    return;
-  }
-
+  if (!monto || monto < 100000) { msg.innerHTML = mostrarAlerta('Minimo $100.000', 'error'); return; }
   const saldo = await obtenerSaldo();
-  if (saldo < monto) {
-    msg.innerHTML = mostrarAlerta('Saldo insuficiente', 'error');
-    return;
-  }
-
-  await supabaseClient.from('inversiones').insert({
-    user_id: userId, producto, monto_invertido: monto, rendimiento_anual: rend, valor_actual: monto
-  });
-
+  if (saldo < monto) { msg.innerHTML = mostrarAlerta('Saldo insuficiente', 'error'); return; }
+  await supabaseClient.from('inversiones').insert({ user_id: userId, producto, monto_invertido: monto, rendimiento_anual: rend, valor_actual: monto });
   await supabaseClient.rpc('retirar_saldo', { p_monto: monto });
   await actualizarSaldoSidebar();
   navegarA('flowinvest');
@@ -1012,54 +838,30 @@ async function renderFlowShield() {
     { tipo: 'Salud', cobertura: 10000000, prima: 35000 },
   ];
 
-  let html = `
-    <div class="app-tabs">
-      <button class="app-tab active" data-tab="mis-seguros">Mis polizas</button>
-      <button class="app-tab" data-tab="nuevo-seguro">Contratar</button>
-    </div>
-    <div class="app-tab-content active" id="tab-mis-seguros">
-  `;
+  let html = '<div class="app-tabs"><button class="app-tab active" data-tab="mis-seguros">Mis polizas</button><button class="app-tab" data-tab="nuevo-seguro">Contratar</button></div><div class="app-tab-content active" id="tab-mis-seguros">';
 
   if (seguros && seguros.length > 0) {
     seguros.forEach(s => {
-      html += `
-        <div class="product-item">
-          <div class="product-item-info">
-            <h4>Seguro de ${s.tipo}</h4>
-            <p>Cobertura: ${formatearDinero(s.cobertura)}</p>
-          </div>
-          <div class="product-item-price">${formatearDinero(s.prima_mensual)}/mes</div>
-        </div>
-      `;
+      html += '<div class="product-item"><div class="product-item-info"><h4>Seguro de ' + s.tipo + '</h4><p>Cobertura: ' + formatearDinero(s.cobertura) + '</p></div><div class="product-item-price">' + formatearDinero(s.prima_mensual) + '/mes</div></div>';
     });
   } else {
-    html += '<div class="app-section"><p style="color:#64748B;">No tienes polizas activas.</p></div>';
+    html += '<div class="app-section"><p style="color:#64748B;">No tienes polizas.</p></div>';
   }
 
-  html += `
-    </div>
-    <div class="app-tab-content" id="tab-nuevo-seguro">
-      <div class="app-section">
-        <div class="app-section-title">Seguros disponibles</div>
-        ${tipos.map(t => `
-          <div class="product-item">
-            <div class="product-item-info"><h4>Seguro de ${t.tipo}</h4><p>Cobertura hasta ${formatearDinero(t.cobertura)}</p></div>
-            <div class="product-item-price">${formatearDinero(t.prima)}/mes</div>
-          </div>
-        `).join('')}
-      </div>
-      <div class="app-section">
-        <div class="app-section-title">Contratar poliza</div>
-        <div class="app-form-group">
-          <label class="app-form-label">Tipo de seguro</label>
-          <select class="app-form-select" id="seguroTipo">
-            ${tipos.map(t => `<option value="${t.tipo}" data-cob="${t.cobertura}" data-prima="${t.prima}">${t.tipo}</option>`).join('')}
-          </select>
-        </div>
-        <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="contratarSeguro()">Contratar poliza</button>
-      </div>
-    </div>
-  `;
+  html += '</div><div class="app-tab-content" id="tab-nuevo-seguro"><div class="app-section"><div class="app-section-title">Disponibles</div>';
+
+  tipos.forEach(t => {
+    html += '<div class="product-item"><div class="product-item-info"><h4>Seguro de ' + t.tipo + '</h4><p>Cobertura: ' + formatearDinero(t.cobertura) + '</p></div><div class="product-item-price">' + formatearDinero(t.prima) + '/mes</div></div>';
+  });
+
+  html += '</div><div class="app-section"><div class="app-section-title">Contratar</div>' +
+    '<div class="app-form-group"><label class="app-form-label">Tipo</label><select class="app-form-select" id="seguroTipo">';
+
+  tipos.forEach(t => {
+    html += '<option value="' + t.tipo + '" data-cob="' + t.cobertura + '" data-prima="' + t.prima + '">' + t.tipo + '</option>';
+  });
+
+  html += '</select></div><button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="contratarSeguro()">Contratar</button></div></div>';
 
   document.getElementById('pageContent').innerHTML = html;
   activarTabs();
@@ -1071,10 +873,7 @@ async function contratarSeguro() {
   const tipo = sel.value;
   const cobertura = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-cob'));
   const prima = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-prima'));
-
-  await supabaseClient.from('seguros').insert({
-    user_id: userId, tipo, cobertura, prima_mensual: prima
-  });
+  await supabaseClient.from('seguros').insert({ user_id: userId, tipo, cobertura, prima_mensual: prima });
   navegarA('flowshield');
 }
 
@@ -1084,60 +883,22 @@ async function renderFlowBusiness() {
   const userId = localStorage.getItem('user_id');
   const { data: cuentas } = await supabaseClient.from('cuentas_empresariales').select('*').eq('user_id', userId).order('created_at', { ascending: false });
 
-  let html = `
-    <div class="app-tabs">
-      <button class="app-tab active" data-tab="mis-empresas">Mis cuentas</button>
-      <button class="app-tab" data-tab="nueva-empresa">Nueva cuenta</button>
-    </div>
-    <div class="app-tab-content active" id="tab-mis-empresas">
-  `;
+  let html = '<div class="app-tabs"><button class="app-tab active" data-tab="mis-empresas">Mis cuentas</button><button class="app-tab" data-tab="nueva-empresa">Nueva cuenta</button></div><div class="app-tab-content active" id="tab-mis-empresas">';
 
   if (cuentas && cuentas.length > 0) {
     cuentas.forEach(c => {
-      html += `
-        <div class="product-item">
-          <div class="product-item-info">
-            <h4>🏢 ${c.nombre_negocio}</h4>
-            <p>NIT: ${c.nit || 'N/A'} | ${c.categoria || 'General'}</p>
-          </div>
-          <div class="product-item-price">${formatearDinero(c.saldo)}</div>
-        </div>
-      `;
+      html += '<div class="product-item"><div class="product-item-info"><h4>🏢 ' + c.nombre_negocio + '</h4><p>NIT: ' + (c.nit || 'N/A') + ' | ' + (c.categoria || 'General') + '</p></div><div class="product-item-price">' + formatearDinero(c.saldo) + '</div></div>';
     });
   } else {
     html += '<div class="app-section"><p style="color:#64748B;">No tienes cuentas empresariales.</p></div>';
   }
 
-  html += `
-    </div>
-    <div class="app-tab-content" id="tab-nueva-empresa">
-      <div class="app-section">
-        <div class="app-section-title">Crear cuenta empresarial</div>
-        <div class="app-form-group">
-          <label class="app-form-label">Nombre del negocio</label>
-          <input class="app-form-input" type="text" id="empNombre" placeholder="Ej: Mi Tienda Online">
-        </div>
-        <div class="app-form-group">
-          <label class="app-form-label">NIT (opcional)</label>
-          <input class="app-form-input" type="text" id="empNit">
-        </div>
-        <div class="app-form-group">
-          <label class="app-form-label">Categoria</label>
-          <select class="app-form-select" id="empCategoria">
-            <option>E-commerce</option>
-            <option>Servicios</option>
-            <option>Tecnologia</option>
-            <option>Alimentos</option>
-            <option>Moda</option>
-            <option>Educacion</option>
-            <option>Otro</option>
-          </select>
-        </div>
-        <div id="empMessage"></div>
-        <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="crearEmpresa()">Crear cuenta</button>
-      </div>
-    </div>
-  `;
+  html += '</div><div class="app-tab-content" id="tab-nueva-empresa"><div class="app-section"><div class="app-section-title">Crear cuenta</div>' +
+    '<div class="app-form-group"><label class="app-form-label">Nombre del negocio</label><input class="app-form-input" type="text" id="empNombre"></div>' +
+    '<div class="app-form-group"><label class="app-form-label">NIT (opcional)</label><input class="app-form-input" type="text" id="empNit"></div>' +
+    '<div class="app-form-group"><label class="app-form-label">Categoria</label><select class="app-form-select" id="empCategoria"><option>E-commerce</option><option>Servicios</option><option>Tecnologia</option><option>Alimentos</option><option>Moda</option><option>Educacion</option><option>Otro</option></select></div>' +
+    '<div id="empMessage"></div>' +
+    '<button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="crearEmpresa()">Crear cuenta</button></div></div>';
 
   document.getElementById('pageContent').innerHTML = html;
   activarTabs();
@@ -1149,15 +910,8 @@ async function crearEmpresa() {
   const nit = document.getElementById('empNit').value;
   const categoria = document.getElementById('empCategoria').value;
   const msg = document.getElementById('empMessage');
-
-  if (!nombre) {
-    msg.innerHTML = mostrarAlerta('Escribe el nombre del negocio', 'error');
-    return;
-  }
-
-  await supabaseClient.from('cuentas_empresariales').insert({
-    user_id: userId, nombre_negocio: nombre, nit, categoria, saldo: 0
-  });
+  if (!nombre) { msg.innerHTML = mostrarAlerta('Escribe el nombre', 'error'); return; }
+  await supabaseClient.from('cuentas_empresariales').insert({ user_id: userId, nombre_negocio: nombre, nit, categoria, saldo: 0 });
   navegarA('flowbusiness');
 }
 
@@ -1168,39 +922,31 @@ async function renderFlowAnalytics() {
   const { data: movs } = await supabaseClient.from('movimientos').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(200);
 
   let ingresos = 0, egresos = 0;
-  if (movs) {
-    movs.forEach(m => {
-      if (m.tipo === 'ingreso') ingresos += Number(m.monto);
-      else egresos += Number(m.monto);
-    });
-  }
+  if (movs) movs.forEach(m => { if (m.tipo === 'ingreso') ingresos += Number(m.monto); else egresos += Number(m.monto); });
   const balance = ingresos - egresos;
 
-  const html = `
-    <div class="metrics-grid">
-      <div class="metric-card"><div class="metric-label">Ingresos</div><div class="metric-value text-green">${formatearDinero(ingresos)}</div></div>
-      <div class="metric-card"><div class="metric-label">Egresos</div><div class="metric-value text-red">${formatearDinero(egresos)}</div></div>
-      <div class="metric-card"><div class="metric-label">Balance</div><div class="metric-value">${formatearDinero(balance)}</div></div>
-      <div class="metric-card"><div class="metric-label">Movimientos</div><div class="metric-value">${movs ? movs.length : 0}</div></div>
-    </div>
+  let html = '<div class="metrics-grid">' +
+    '<div class="metric-card"><div class="metric-label">Ingresos</div><div class="metric-value text-green">' + formatearDinero(ingresos) + '</div></div>' +
+    '<div class="metric-card"><div class="metric-label">Egresos</div><div class="metric-value text-red">' + formatearDinero(egresos) + '</div></div>' +
+    '<div class="metric-card"><div class="metric-label">Balance</div><div class="metric-value">' + formatearDinero(balance) + '</div></div>' +
+    '<div class="metric-card"><div class="metric-label">Movimientos</div><div class="metric-value">' + (movs ? movs.length : 0) + '</div></div>' +
+    '</div>';
 
-    <div class="app-section">
-      <div class="app-section-title">Historial completo</div>
-      ${movs && movs.length > 0 ? `
-        <table class="app-table">
-          <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripcion</th><th style="text-align:right;">Monto</th></tr></thead>
-          <tbody>
-            ${movs.slice(0, 30).map(m => {
-              const signo = m.tipo === 'ingreso' ? '+' : '-';
-              const clase = m.tipo === 'ingreso' ? 'text-green' : 'text-red';
-              return `<tr><td>${formatearFechaCorta(m.created_at)}</td><td>${m.tipo === 'ingreso' ? '🟢' : '🔴'}</td><td>${m.descripcion}</td><td class="${clase}" style="text-align:right;">${signo}${formatearDinero(m.monto)}</td></tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      ` : '<p style="color:#64748B;">No hay movimientos.</p>'}
-    </div>
-  `;
+  html += '<div class="app-section"><div class="app-section-title">Historial completo</div>';
 
+  if (movs && movs.length > 0) {
+    html += '<table class="app-table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Descripcion</th><th style="text-align:right;">Monto</th></tr></thead><tbody>';
+    movs.slice(0, 30).forEach(m => {
+      const signo = m.tipo === 'ingreso' ? '+' : '-';
+      const clase = m.tipo === 'ingreso' ? 'text-green' : 'text-red';
+      html += '<tr><td>' + formatearFechaCorta(m.created_at) + '</td><td>' + (m.tipo === 'ingreso' ? '🟢' : '🔴') + '</td><td>' + m.descripcion + '</td><td class="' + clase + '" style="text-align:right;">' + signo + formatearDinero(m.monto) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+  } else {
+    html += '<p style="color:#64748B;">No hay movimientos.</p>';
+  }
+
+  html += '</div>';
   document.getElementById('pageContent').innerHTML = html;
 }
 
@@ -1211,114 +957,52 @@ async function renderCreditos() {
   const { data: solicitudes } = await supabaseClient.from('solicitudes').select('*').eq('user_id', userId).order('created_at', { ascending: false });
   const { data: creditos } = await supabaseClient.from('creditos').select('*').eq('user_id', userId).order('created_at', { ascending: false });
 
-  let html = `
-    <div class="app-tabs">
-      <button class="app-tab active" data-tab="solicitar">Solicitar credito</button>
-      <button class="app-tab" data-tab="mis-creditos">Mis creditos</button>
-      <button class="app-tab" data-tab="historial-cred">Historial</button>
-    </div>
+  let html = '<div class="app-tabs"><button class="app-tab active" data-tab="solicitar">Solicitar</button><button class="app-tab" data-tab="mis-creditos">Mis creditos</button><button class="app-tab" data-tab="historial-cred">Historial</button></div>';
 
-    <div class="app-tab-content active" id="tab-solicitar">
-      <div class="app-section">
-        <div class="app-section-title">Nueva solicitud</div>
-        <div class="app-form-group">
-          <label class="app-form-label">Tipo de negocio</label>
-          <select class="app-form-select" id="credTipo">
-            <option>E-commerce</option>
-            <option>Creador de contenido</option>
-            <option>Servicios digitales</option>
-            <option>SaaS / App</option>
-            <option>Marketing digital</option>
-            <option>Otro</option>
-          </select>
-        </div>
-        <div class="app-form-group">
-          <label class="app-form-label">Ingresos mensuales (COP)</label>
-          <input class="app-form-input" type="number" id="credIngresos" value="3000000">
-        </div>
-        <div class="app-form-group">
-          <label class="app-form-label">Meses con el negocio</label>
-          <input class="app-form-input" type="number" id="credMeses" value="12">
-        </div>
-        <div class="app-form-group">
-          <label class="app-form-label">Monto solicitado (COP)</label>
-          <input class="app-form-input" type="number" id="credMonto" value="1000000">
-        </div>
-        <div class="app-form-group">
-          <label class="app-form-label">Plazo (dias)</label>
-          <select class="app-form-select" id="credPlazo">
-            <option value="30">30 dias</option>
-            <option value="60">60 dias</option>
-            <option value="90" selected>90 dias</option>
-            <option value="120">120 dias</option>
-            <option value="180">180 dias</option>
-          </select>
-        </div>
-        <div class="app-form-group">
-          <label class="app-form-label">Historial de pagos</label>
-          <select class="app-form-select" id="credHistorial">
-            <option>Sin historial</option>
-            <option>1 credito pagado</option>
-            <option>2-3 creditos pagados</option>
-            <option>Mas de 3 creditos</option>
-          </select>
-        </div>
-        <div id="credMessage"></div>
-        <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="solicitarCredito()">Analizar con IA</button>
-      </div>
-    </div>
+  html += '<div class="app-tab-content active" id="tab-solicitar"><div class="app-section"><div class="app-section-title">Nueva solicitud</div>' +
+    '<div class="app-form-group"><label class="app-form-label">Tipo de negocio</label><select class="app-form-select" id="credTipo"><option>E-commerce</option><option>Creador de contenido</option><option>Servicios digitales</option><option>SaaS / App</option><option>Marketing digital</option><option>Otro</option></select></div>' +
+    '<div class="app-form-group"><label class="app-form-label">Ingresos mensuales (COP)</label><input class="app-form-input" type="number" id="credIngresos" value="3000000"></div>' +
+    '<div class="app-form-group"><label class="app-form-label">Meses con el negocio</label><input class="app-form-input" type="number" id="credMeses" value="12"></div>' +
+    '<div class="app-form-group"><label class="app-form-label">Monto (COP)</label><input class="app-form-input" type="number" id="credMonto" value="1000000"></div>' +
+    '<div class="app-form-group"><label class="app-form-label">Plazo</label><select class="app-form-select" id="credPlazo"><option value="30">30 dias</option><option value="60">60 dias</option><option value="90" selected>90 dias</option><option value="120">120 dias</option><option value="180">180 dias</option></select></div>' +
+    '<div class="app-form-group"><label class="app-form-label">Historial</label><select class="app-form-select" id="credHistorial"><option>Sin historial</option><option>1 credito pagado</option><option>2-3 creditos pagados</option><option>Mas de 3 creditos</option></select></div>' +
+    '<div id="credMessage"></div>' +
+    '<button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="solicitarCredito()">Analizar con IA</button></div></div>';
 
-    <div class="app-tab-content" id="tab-mis-creditos">
-  `;
+  html += '<div class="app-tab-content" id="tab-mis-creditos">';
 
   if (creditos && creditos.length > 0) {
     creditos.forEach(c => {
       const progreso = c.num_cuotas > 0 ? (c.cuotas_pagadas / c.num_cuotas) * 100 : 0;
-      html += `
-        <div class="meta-card">
-          <div class="meta-header">
-            <div class="meta-nombre">Credito #${c.id}</div>
-            <div class="badge ${c.estado === 'activo' ? 'badge-green' : 'badge-blue'}">${c.estado}</div>
-          </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px;">
-            <div><div style="font-size:12px; color:#64748B;">Monto</div><div style="font-weight:700;">${formatearDinero(c.monto_aprobado)}</div></div>
-            <div><div style="font-size:12px; color:#64748B;">Tasa anual</div><div style="font-weight:700;">${c.tasa_anual}%</div></div>
-            <div><div style="font-size:12px; color:#64748B;">Saldo pendiente</div><div style="font-weight:700;">${formatearDinero(c.saldo_pendiente)}</div></div>
-            <div><div style="font-size:12px; color:#64748B;">Cuotas</div><div style="font-weight:700;">${c.cuotas_pagadas}/${c.num_cuotas}</div></div>
-          </div>
-          <div class="meta-progress-bar"><div class="meta-progress-fill" style="width:${progreso}%"></div></div>
-          <button class="btn-secondary-sm" style="margin-top:12px;" onclick="generarContratoPDF(${c.id})">📄 Descargar contrato PDF</button>
-        </div>
-      `;
+      html += '<div class="meta-card">' +
+        '<div class="meta-header"><div class="meta-nombre">Credito #' + c.id + '</div><div class="badge ' + (c.estado === 'activo' ? 'badge-green' : 'badge-blue') + '">' + c.estado + '</div></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">' +
+        '<div><div style="font-size:12px;color:#64748B;">Monto</div><div style="font-weight:700;">' + formatearDinero(c.monto_aprobado) + '</div></div>' +
+        '<div><div style="font-size:12px;color:#64748B;">Tasa</div><div style="font-weight:700;">' + c.tasa_anual + '%</div></div>' +
+        '<div><div style="font-size:12px;color:#64748B;">Saldo</div><div style="font-weight:700;">' + formatearDinero(c.saldo_pendiente) + '</div></div>' +
+        '<div><div style="font-size:12px;color:#64748B;">Cuotas</div><div style="font-weight:700;">' + c.cuotas_pagadas + '/' + c.num_cuotas + '</div></div>' +
+        '</div>' +
+        '<div class="meta-progress-bar"><div class="meta-progress-fill" style="width:' + progreso + '%"></div></div>' +
+        '<button class="btn-secondary-sm" style="margin-top:12px;" onclick="generarContratoPDF(' + c.id + ')">📄 Descargar contrato</button>' +
+        '</div>';
     });
   } else {
     html += '<div class="app-section"><p style="color:#64748B;">No tienes creditos activos.</p></div>';
   }
 
-  html += `
-    </div>
-    <div class="app-tab-content" id="tab-historial-cred">
-      <div class="app-section">
-        <div class="app-section-title">Historial de solicitudes</div>
-        ${solicitudes && solicitudes.length > 0 ? `
-          <table class="app-table">
-            <thead><tr><th>Fecha</th><th>Monto</th><th>Score</th><th>Decision</th></tr></thead>
-            <tbody>
-              ${solicitudes.map(s => `
-                <tr>
-                  <td>${formatearFechaCorta(s.created_at)}</td>
-                  <td>${formatearDinero(s.monto_solicitado)}</td>
-                  <td>${s.score || '-'}</td>
-                  <td><span class="badge ${s.decision === 'APROBADO' ? 'badge-green' : s.decision === 'RECHAZADO' ? 'badge-red' : 'badge-yellow'}">${s.decision || '-'}</span></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        ` : '<p style="color:#64748B;">No hay solicitudes.</p>'}
-      </div>
-    </div>
-  `;
+  html += '</div><div class="app-tab-content" id="tab-historial-cred"><div class="app-section"><div class="app-section-title">Historial</div>';
 
+  if (solicitudes && solicitudes.length > 0) {
+    html += '<table class="app-table"><thead><tr><th>Fecha</th><th>Monto</th><th>Score</th><th>Decision</th></tr></thead><tbody>';
+    solicitudes.forEach(s => {
+      html += '<tr><td>' + formatearFechaCorta(s.created_at) + '</td><td>' + formatearDinero(s.monto_solicitado) + '</td><td>' + (s.score || '-') + '</td><td><span class="badge ' + (s.decision === 'APROBADO' ? 'badge-green' : s.decision === 'RECHAZADO' ? 'badge-red' : 'badge-yellow') + '">' + (s.decision || '-') + '</span></td></tr>';
+    });
+    html += '</tbody></table>';
+  } else {
+    html += '<p style="color:#64748B;">No hay solicitudes.</p>';
+  }
+
+  html += '</div></div>';
   document.getElementById('pageContent').innerHTML = html;
   activarTabs();
 }
@@ -1337,7 +1021,7 @@ async function solicitarCredito() {
     fuentes: 'Stripe, Nequi',
   };
 
-  const prompt = 'Eres un analista de riesgo crediticio. Analiza esta solicitud de microcredito para un emprendedor digital colombiano.\n\nDATOS:\n- Tipo de negocio: ' + datos.tipo + '\n- Ingresos mensuales: ' + datos.ingresos + ' COP\n- Meses con el negocio: ' + datos.meses + '\n- Monto solicitado: ' + datos.monto + ' COP\n- Plazo: ' + datos.plazo + ' dias\n- Historial: ' + datos.historial + '\n- Fuentes: ' + datos.fuentes + '\n\nResponde SOLO con este formato:\nSCORE: <numero 0-1000>\nDECISION: <APROBADO | REVISION | RECHAZADO>\nMONTO_APROBADO: <numero>\nTASA_ANUAL: <numero>\nRAZON_1: <texto corto>\nRAZON_2: <texto corto>\nRAZON_3: <texto corto>';
+  const prompt = 'Eres un analista de riesgo crediticio. Analiza esta solicitud de microcredito para un emprendedor digital colombiano.\n\nDATOS:\n- Tipo de negocio: ' + datos.tipo + '\n- Ingresos mensuales: ' + datos.ingresos + ' COP\n- Meses con el negocio: ' + datos.meses + '\n- Monto solicitado: ' + datos.monto + ' COP\n- Plazo: ' + datos.plazo + ' dias\n- Historial: ' + datos.historial + '\n\nResponde SOLO con este formato:\nSCORE: <numero 0-1000>\nDECISION: <APROBADO | REVISION | RECHAZADO>\nMONTO_APROBADO: <numero>\nTASA_ANUAL: <numero>\nRAZON_1: <texto>\nRAZON_2: <texto>\nRAZON_3: <texto>';
 
   try {
     const response = await fetch(CONFIG.URL_GROQ, {
@@ -1368,24 +1052,17 @@ async function solicitarCredito() {
 
     const userId = localStorage.getItem('user_id');
     await supabaseClient.from('solicitudes').insert({
-      user_id: userId,
-      monto_solicitado: datos.monto,
-      plazo_dias: datos.plazo,
-      tipo_negocio: datos.tipo,
-      ingresos_mensuales: datos.ingresos,
-      score: score,
-      decision: decision,
-      monto_aprobado: montoAprobado,
-      tasa_sugerida: tasa,
+      user_id: userId, monto_solicitado: datos.monto, plazo_dias: datos.plazo,
+      tipo_negocio: datos.tipo, ingresos_mensuales: datos.ingresos,
+      score, decision, monto_aprobado: montoAprobado, tasa_sugerida: tasa,
       razones: texto.substring(0, 500),
     });
 
-    const titulo = decision === 'APROBADO' ? '🎉 Credito aprobado' : decision === 'RECHAZADO' ? '❌ Credito rechazado' : '⏳ Credito en revision';
+    const titulo = decision === 'APROBADO' ? '🎉 Credito aprobado' : decision === 'RECHAZADO' ? '❌ Rechazado' : '⏳ En revision';
     const tipo = decision === 'APROBADO' ? 'success' : decision === 'RECHAZADO' ? 'error' : 'warning';
-    await crearNotificacion(userId, titulo, 'Solicitud por ' + formatearDinero(datos.monto) + ' - Score: ' + score, tipo);
+    await crearNotificacion(userId, titulo, 'Score: ' + score, tipo);
 
-    msg.innerHTML = mostrarAlerta('✅ Solicitud procesada: ' + decision + ' - Score: ' + score + '/1000', decision === 'APROBADO' ? 'success' : 'info');
-
+    msg.innerHTML = mostrarAlerta('✅ ' + decision + ' - Score: ' + score, decision === 'APROBADO' ? 'success' : 'info');
     setTimeout(() => navegarA('creditos'), 2000);
   } catch (e) {
     msg.innerHTML = mostrarAlerta('Error: ' + e.message, 'error');
@@ -1399,7 +1076,6 @@ async function generarContratoPDF(creditoId) {
   const { data: credito } = await supabaseClient.from('creditos').select('*').eq('id', creditoId).single();
   const { data: cuotas } = await supabaseClient.from('cuotas').select('*').eq('credito_id', creditoId).order('numero');
   const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
-
   if (!credito) { alert('Credito no encontrado'); return; }
 
   const { jsPDF } = window.jspdf;
@@ -1409,12 +1085,10 @@ async function generarContratoPDF(creditoId) {
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(130, 10, 209);
   doc.text('FLOWBANK', 105, 20, { align: 'center' });
-
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
   doc.setFont('helvetica', 'normal');
   doc.text('Contrato de Microcredito Digital', 105, 27, { align: 'center' });
-
   doc.setDrawColor(130, 10, 209);
   doc.setLineWidth(0.8);
   doc.line(20, 32, 190, 32);
@@ -1423,25 +1097,23 @@ async function generarContratoPDF(creditoId) {
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
   doc.text('INFORMACION DEL CLIENTE', 20, 45);
-
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(51, 65, 85);
   const nombres = ((profile?.nombres || '') + ' ' + (profile?.apellidos || '')).trim() || 'No registrado';
   doc.text('Nombre: ' + nombres, 20, 54);
-  doc.text('Cedula: ' + (profile?.cedula || 'No registrada'), 20, 60);
-  doc.text('Telefono: ' + (profile?.telefono || 'No registrado'), 20, 66);
+  doc.text('Cedula: ' + (profile?.cedula || 'N/A'), 20, 60);
+  doc.text('Telefono: ' + (profile?.telefono || 'N/A'), 20, 66);
   doc.text('Email: ' + (localStorage.getItem('user_email') || ''), 20, 72);
 
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(15, 23, 42);
   doc.text('CONDICIONES DEL CREDITO', 20, 86);
-
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(51, 65, 85);
-  doc.text('Monto aprobado: ' + formatearDinero(credito.monto_aprobado) + ' COP', 20, 95);
+  doc.text('Monto aprobado: ' + formatearDinero(credito.monto_aprobado), 20, 95);
   doc.text('Tasa anual: ' + credito.tasa_anual + '%', 20, 101);
   doc.text('Plazo: ' + credito.plazo_dias + ' dias', 20, 107);
   doc.text('Numero de cuotas: ' + credito.num_cuotas, 20, 113);
@@ -1486,20 +1158,15 @@ async function generarContratoPDF(creditoId) {
     });
   }
 
-  y += 10;
-  if (y > 230) { doc.addPage(); y = 20; }
+  y += 15;
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(15, 23, 42);
   doc.text('TERMINOS Y CONDICIONES', 20, y);
   y += 8;
-
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
-  const terminos = 'El presente contrato se celebra bajo la modalidad de microcredito digital. El cliente se compromete a pagar las cuotas en las fechas establecidas. Este documento es un prototipo demostrativo. No representa una obligacion financiera real.';
-  const lineas = doc.splitTextToSize(terminos, 170);
-  doc.text(lineas, 20, y);
+  doc.text('Contrato bajo modalidad de microcredito digital. Prototipo demostrativo. No representa obligacion financiera real.', 20, y);
 
   doc.save('contrato_flowbank_' + creditoId + '.pdf');
 }
@@ -1510,45 +1177,29 @@ async function renderVerificacion() {
   const userId = localStorage.getItem('user_id');
   const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
 
-  const html = `
-    <div class="app-section">
-      <div class="app-section-title">Datos personales</div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-        <div><div style="font-size:12px; color:#64748B;">Nombres</div><div style="font-weight:700;">${profile?.nombres || 'No registrado'}</div></div>
-        <div><div style="font-size:12px; color:#64748B;">Apellidos</div><div style="font-weight:700;">${profile?.apellidos || 'No registrado'}</div></div>
-        <div><div style="font-size:12px; color:#64748B;">Cedula</div><div style="font-weight:700;">${profile?.cedula || 'No registrada'}</div></div>
-        <div><div style="font-size:12px; color:#64748B;">Telefono</div><div style="font-weight:700;">${profile?.telefono || 'No registrado'}</div></div>
-      </div>
-    </div>
+  let html = '<div class="app-section"><div class="app-section-title">Datos personales</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
+    '<div><div style="font-size:12px;color:#64748B;">Nombres</div><div style="font-weight:700;">' + (profile?.nombres || 'No registrado') + '</div></div>' +
+    '<div><div style="font-size:12px;color:#64748B;">Apellidos</div><div style="font-weight:700;">' + (profile?.apellidos || 'No registrado') + '</div></div>' +
+    '<div><div style="font-size:12px;color:#64748B;">Cedula</div><div style="font-weight:700;">' + (profile?.cedula || 'No registrada') + '</div></div>' +
+    '<div><div style="font-size:12px;color:#64748B;">Telefono</div><div style="font-weight:700;">' + (profile?.telefono || 'No registrado') + '</div></div>' +
+    '</div></div>';
 
-    <div class="app-section">
-      <div class="app-section-title">Verificacion biometrica con camara</div>
-      <p style="color:#64748B; margin-bottom:16px;">Toma una foto de tu rostro de frente.</p>
-      <div style="text-align:center;">
-        <video id="videoCam" autoplay playsinline style="width:100%; max-width:400px; border-radius:16px; background:#000; display:block; margin:0 auto 16px;"></video>
-        <canvas id="canvasFoto" style="display:none;"></canvas>
-        <div style="margin-top:16px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-          <button class="btn-primary" onclick="iniciarCamara()">📸 Activar camara</button>
-          <button class="btn-primary" onclick="capturarFoto('${userId}')">✅ Tomar foto</button>
-        </div>
-      </div>
-      <div id="verifMessage"></div>
-    </div>
+  html += '<div class="app-section"><div class="app-section-title">Verificacion con camara</div><p style="color:#64748B;margin-bottom:16px;">Toma una foto de tu rostro.</p>' +
+    '<div style="text-align:center;"><video id="videoCam" autoplay playsinline style="width:100%;max-width:400px;border-radius:16px;background:#000;display:block;margin:0 auto 16px;"></video><canvas id="canvasFoto" style="display:none;"></canvas>' +
+    '<div style="margin-top:16px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">' +
+    '<button class="btn-primary" onclick="iniciarCamara()">📸 Activar camara</button>' +
+    '<button class="btn-primary" onclick="capturarFoto(\'' + userId + '\')">✅ Tomar foto</button>' +
+    '</div></div><div id="verifMessage"></div></div>';
 
-    <div class="app-section">
-      <div class="app-section-title">Codigo de recuperacion</div>
-      ${profile?.recovery_code ? `
-        <div class="alert alert-warning">Guarda este codigo en un lugar seguro</div>
-        <div style="background:#0F172A; color:#10B981; padding:20px; border-radius:12px; font-family:monospace; font-size:18px; font-weight:700; text-align:center; letter-spacing:2px; word-break:break-all;">
-          ${profile.recovery_code}
-        </div>
-      ` : `
-        <p style="color:#64748B; margin-bottom:16px;">Aun no has generado tu codigo.</p>
-        <button class="btn-primary" onclick="generarCodigo('${userId}')">Generar codigo</button>
-      `}
-    </div>
-  `;
+  html += '<div class="app-section"><div class="app-section-title">Codigo de recuperacion</div>';
 
+  if (profile?.recovery_code) {
+    html += '<div class="alert alert-warning">Guarda este codigo</div><div style="background:#0F172A;color:#10B981;padding:20px;border-radius:12px;font-family:monospace;font-size:18px;font-weight:700;text-align:center;letter-spacing:2px;word-break:break-all;">' + profile.recovery_code + '</div>';
+  } else {
+    html += '<p style="color:#64748B;margin-bottom:16px;">Aun no has generado tu codigo.</p><button class="btn-primary" onclick="generarCodigo(\'' + userId + '\')">Generar codigo</button>';
+  }
+
+  html += '</div>';
   document.getElementById('pageContent').innerHTML = html;
 }
 
@@ -1558,7 +1209,7 @@ async function iniciarCamara() {
     const video = document.getElementById('videoCam');
     video.srcObject = streamCamara;
   } catch (e) {
-    document.getElementById('verifMessage').innerHTML = mostrarAlerta('No se pudo acceder a la camara: ' + e.message, 'error');
+    document.getElementById('verifMessage').innerHTML = mostrarAlerta('No se pudo acceder: ' + e.message, 'error');
   }
 }
 
@@ -1566,11 +1217,7 @@ async function capturarFoto(userId) {
   const video = document.getElementById('videoCam');
   const canvas = document.getElementById('canvasFoto');
   const msg = document.getElementById('verifMessage');
-
-  if (!video.srcObject) {
-    msg.innerHTML = mostrarAlerta('Primero activa la camara', 'error');
-    return;
-  }
+  if (!video.srcObject) { msg.innerHTML = mostrarAlerta('Primero activa la camara', 'error'); return; }
 
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
@@ -1578,29 +1225,16 @@ async function capturarFoto(userId) {
 
   canvas.toBlob(async function (blob) {
     const fileName = userId + '_' + Date.now() + '.jpg';
-
-    const { error } = await supabaseClient.storage
-      .from('verificaciones')
-      .upload(fileName, blob, { contentType: 'image/jpeg' });
-
-    if (error) {
-      msg.innerHTML = mostrarAlerta('Error subiendo foto: ' + error.message, 'error');
-      return;
-    }
-
+    const { error } = await supabaseClient.storage.from('verificaciones').upload(fileName, blob, { contentType: 'image/jpeg' });
+    if (error) { msg.innerHTML = mostrarAlerta('Error: ' + error.message, 'error'); return; }
     const { data: publicData } = supabaseClient.storage.from('verificaciones').getPublicUrl(fileName);
-
     await supabaseClient.from('profiles').update({
       foto_verificacion_url: publicData.publicUrl,
       verificacion_estado: 'verificado',
       verificacion_fecha: new Date().toISOString(),
       verificado: true,
     }).eq('id', userId);
-
-    if (streamCamara) {
-      streamCamara.getTracks().forEach(t => t.stop());
-    }
-
+    if (streamCamara) streamCamara.getTracks().forEach(t => t.stop());
     msg.innerHTML = mostrarAlerta('✅ Verificacion completada', 'success');
     setTimeout(() => navegarA('verificacion'), 2000);
   }, 'image/jpeg', 0.85);
@@ -1635,20 +1269,10 @@ async function renderNotificaciones() {
   } else {
     const noLeidas = notifs.filter(n => !n.leida).length;
     if (noLeidas > 0) {
-      html += '<div class="alert alert-warning">Tienes ' + noLeidas + ' notificaciones sin leer <button class="btn-secondary-sm" onclick="marcarTodasLeidas(\'' + userId + '\')" style="margin-left:12px;">Marcar todas</button></div>';
+      html += '<div class="alert alert-warning">Tienes ' + noLeidas + ' sin leer <button class="btn-secondary-sm" onclick="marcarTodasLeidas(\'' + userId + '\')" style="margin-left:12px;">Marcar todas</button></div>';
     }
-
     notifs.forEach(n => {
-      html += `
-        <div class="notif-item ${n.leida ? '' : 'unread'}">
-          <div class="notif-icon">${n.leida ? '📭' : '📬'}</div>
-          <div class="notif-content">
-            <div class="notif-title">${n.titulo}</div>
-            <div class="notif-message">${n.mensaje}</div>
-            <div class="notif-date">${formatearFecha(n.created_at)}</div>
-          </div>
-        </div>
-      `;
+      html += '<div class="notif-item ' + (n.leida ? '' : 'unread') + '"><div class="notif-icon">' + (n.leida ? '📭' : '📬') + '</div><div class="notif-content"><div class="notif-title">' + n.titulo + '</div><div class="notif-message">' + n.mensaje + '</div><div class="notif-date">' + formatearFecha(n.created_at) + '</div></div></div>';
     });
   }
 
@@ -1685,7 +1309,7 @@ async function enviarChat() {
 
   try {
     const saldo = await obtenerSaldo();
-    const nombre = (datosPersonales && datosPersonales.nombres ? datosPersonales.nombres : 'Usuario') + ' ' + (datosPersonales && datosPersonales.apellidos ? datosPersonales.apellidos : '');
+    const nombre = (datosPersonales && datosPersonales.nombres ? datosPersonales.nombres : 'Usuario');
 
     const response = await fetch(CONFIG.URL_GROQ, {
       method: 'POST',
@@ -1696,7 +1320,7 @@ async function enviarChat() {
       body: JSON.stringify({
         model: CONFIG.MODELO_GROQ,
         messages: [
-          { role: 'system', content: 'Eres el asistente virtual de FlowBank, un banco digital colombiano para emprendedores. Respondes en espanol, amable y conciso (maximo 3 lineas). El usuario se llama ' + nombre + ' y tiene saldo ' + formatearDinero(saldo) + '. Ayudas con: transferencias, tarjeta, ahorro, inversiones, seguros, creditos con IA.' },
+          { role: 'system', content: 'Eres el asistente virtual de FlowBank, un banco digital colombiano para emprendedores. Respondes en espanol, amable y conciso (maximo 3 lineas). El usuario se llama ' + nombre + ' y tiene saldo ' + formatearDinero(saldo) + '.' },
           { role: 'user', content: mensaje }
         ],
         temperature: 0.5,
@@ -1715,6 +1339,8 @@ async function enviarChat() {
   } catch (e) {
     const loadingEl = document.getElementById('chatLoading');
     if (loadingEl) loadingEl.remove();
-    mensajes.innerHTML += '<div class="chat-message chat-bot">Lo siento, hubo un error. Intenta de nuevo.</div>';
+    mensajes.innerHTML += '<div class="chat-message chat-bot">Lo siento, hubo un error.</div>';
   }
 }
+
+// ============ FIN DEL ARCHIVO ============
