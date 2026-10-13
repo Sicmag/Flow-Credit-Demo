@@ -147,7 +147,7 @@ async function obtenerSaldo() {
 }
 
 async function obtenerCuenta() {
-  const userId = localStorage.getItem('user_id');
+  const userId =Com localStorage.getItem('user_id');
   const { data } = await supabaseClient.from('cuentas').select('*').eq('user_id', userId).single();
   return data;
 }
@@ -156,7 +156,7 @@ async function cargarSidebar() {
   const email = localStorage.getItem('user_email');
   let nombreCompleto = email.split('@')[0];
   if (datosPersonales && datosPersonales.nombres) {
-    nombreCompleto = (datosPersonales.nombres + ' ' + (datosPersonales.apellidos || '')).trim();
+    nombrepleto = (datosPersonales.nombres + ' ' + (datosPersonales.apellidos || '')).trim();
   }
   document.getElementById('sidebarNombre').textContent = nombreCompleto;
   document.getElementById('sidebarEmail').textContent = email;
@@ -180,7 +180,7 @@ async function renderDashboard() {
     if (aprobadas.length > 0) score = aprobadas[0].score;
   }
 
-  let html = `
+  const html = `
     <div class="metrics-grid">
       <div class="metric-card"><div class="metric-label">Saldo disponible</div><div class="metric-value">${formatearDinero(saldo)}</div></div>
       <div class="metric-card"><div class="metric-label">Score crediticio</div><div class="metric-value">${score}/1000</div></div>
@@ -239,9 +239,12 @@ async function renderDashboard() {
 async function renderFlowPay() {
   const cuenta = await obtenerCuenta();
   const saldo = cuenta ? Number(cuenta.saldo) : 0;
+  const userIdActual = localStorage.getItem('user_id');
+
+  const { data: perfil } = await supabaseClient.from('profiles').select('es_admin').eq('id', userIdActual).single();
+  const esAdmin = perfil?.es_admin === true;
 
   const { data: usuarios } = await supabaseClient.from('usuarios_registrados').select('*');
-  const userIdActual = localStorage.getItem('user_id');
   const otros = (usuarios || []).filter(u => u.user_id !== userIdActual);
 
   const { data: transferencias } = await supabaseClient
@@ -250,6 +253,14 @@ async function renderFlowPay() {
     .or('emisor_id.eq.' + userIdActual + ',receptor_id.eq.' + userIdActual)
     .order('created_at', { ascending: false })
     .limit(20);
+
+  let codigosPendientes = [];
+  if (esAdmin) {
+    const { data } = await supabaseClient.from('codigos_retiro_admin').select('*').eq('estado', 'pendiente').order('created_at', { ascending: false });
+    codigosPendientes = data || [];
+  }
+
+  const { data: misCodigos } = await supabaseClient.from('codigos_retiro').select('*').eq('user_id', userIdActual).order('created_at', { ascending: false });
 
   let html = `
     <div class="metrics-grid">
@@ -262,16 +273,24 @@ async function renderFlowPay() {
         <div class="metric-value">${formatearDinero(saldo)}</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Estado</div>
-        <div class="metric-value" style="font-size:16px;">🟢 Activa</div>
+        <div class="metric-label">Rol</div>
+        <div class="metric-value" style="font-size:16px;">${esAdmin ? '👑 Administrador' : '👤 Cliente'}</div>
       </div>
     </div>
+
+    ${esAdmin ? `
+      <div class="alert alert-warning">
+        <strong>👑 Panel de Administrador</strong><br>
+        Tienes ${codigosPendientes.length} codigos de retiro pendientes de validar.
+      </div>
+    ` : ''}
 
     <div class="app-tabs">
       <button class="app-tab active" data-tab="enviar">Enviar</button>
       <button class="app-tab" data-tab="recargar">Recargar</button>
-      <button class="app-tab" data-tab="retirar">Retirar</button>
+      <button class="app-tab" data-tab="retirar">Retirar con codigo</button>
       <button class="app-tab" data-tab="servicios">Servicios</button>
+      ${esAdmin ? '<button class="app-tab" data-tab="admin-codigos">Validar codigos</button>' : ''}
       <button class="app-tab" data-tab="historial">Historial</button>
     </div>
 
@@ -301,7 +320,7 @@ async function renderFlowPay() {
     <div class="app-tab-content" id="tab-recargar">
       <div class="app-section">
         <div class="app-section-title">Recargar saldo</div>
-        <p style="color:#64748B; margin-bottom:16px;">Simula una recarga desde banco externo</p>
+        <p style="color:#64748B; margin-bottom:16px;">Simula una recarga desde banco externo a tu cuenta FlowBank.</p>
         <div class="app-form-group">
           <label class="app-form-label">Monto a recargar (COP)</label>
           <input class="app-form-input" type="number" id="recargarMonto" min="10000" value="100000">
@@ -313,19 +332,40 @@ async function renderFlowPay() {
 
     <div class="app-tab-content" id="tab-retirar">
       <div class="app-section">
-        <div class="app-section-title">Retirar a banco externo</div>
+        <div class="app-section-title">Retirar con codigo</div>
+        <p style="color:#64748B; margin-bottom:16px;">Genera un codigo para retirar efectivo en un punto autorizado.</p>
         <div class="app-form-group">
           <label class="app-form-label">Monto a retirar (COP)</label>
-          <input class="app-form-input" type="number" id="retirarMonto" min="10000" value="50000">
+          <input class="app-form-input" type="number" id="retiroMonto" min="10000" value="50000">
         </div>
-        <div id="retirarMessage"></div>
-        <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="retirarSaldo()">Retirar</button>
+        <div id="retiroMessage"></div>
+        <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="generarCodigoRetiro()">Generar codigo de retiro</button>
+      </div>
+
+      <div class="app-section">
+        <div class="app-section-title">Mis codigos de retiro</div>
+        ${misCodigos && misCodigos.length > 0 ? `
+          <table class="app-table">
+            <thead><tr><th>Codigo</th><th>Monto</th><th>Estado</th><th>Fecha</th></tr></thead>
+            <tbody>
+              ${misCodigos.map(c => `
+                <tr>
+                  <td style="font-family:monospace; font-weight:700; color:#820AD1;">${c.codigo}</td>
+                  <td>${formatearDinero(c.monto)}</td>
+                  <td><span class="badge ${c.estado === 'pendiente' ? 'badge-yellow' : 'badge-green'}">${c.estado}</span></td>
+                  <td>${formatearFechaCorta(c.created_at)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : '<p style="color:#64748B;">No has generado codigos de retiro.</p>'}
       </div>
     </div>
 
     <div class="app-tab-content" id="tab-servicios">
       <div class="app-section">
         <div class="app-section-title">Pagar servicios</div>
+        <p style="color:#64748B; margin-bottom:16px;">Se descuenta directamente de tu saldo disponible.</p>
         <div class="app-form-group">
           <label class="app-form-label">Servicio</label>
           <select class="app-form-select" id="servicioNombre">
@@ -345,6 +385,31 @@ async function renderFlowPay() {
         <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="pagarServicio()">Pagar servicio</button>
       </div>
     </div>
+
+    ${esAdmin ? `
+      <div class="app-tab-content" id="tab-admin-codigos">
+        <div class="app-section">
+          <div class="app-section-title">👑 Codigos pendientes de validar</div>
+          <p style="color:#64748B; margin-bottom:16px;">Entrega el efectivo al cliente y marca el codigo como usado.</p>
+          ${codigosPendientes && codigosPendientes.length > 0 ? `
+            <table class="app-table">
+              <thead><tr><th>Codigo</th><th>Cliente</th><th>Monto</th><th>Fecha</th><th></th></tr></thead>
+              <tbody>
+                ${codigosPendientes.map(c => `
+                  <tr>
+                    <td style="font-family:monospace; font-weight:700; color:#820AD1;">${c.codigo}</td>
+                    <td>${c.cliente_email}<br><small style="color:#64748B;">${c.cliente_nombre || ''}</small></td>
+                    <td style="font-weight:700;">${formatearDinero(c.monto)}</td>
+                    <td>${formatearFechaCorta(c.created_at)}</td>
+                    <td><button class="btn-primary" style="font-size:12px; padding:6px 12px;" onclick="validarCodigo(${c.id}, '${c.codigo}')">✅ Validar</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : '<p style="color:#64748B;">No hay codigos pendientes.</p>'}
+        </div>
+      </div>
+    ` : ''}
 
     <div class="app-tab-content" id="tab-historial">
       <div class="app-section">
@@ -439,24 +504,6 @@ async function recargarSaldo() {
   }
 }
 
-async function retirarSaldo() {
-  const monto = parseFloat(document.getElementById('retirarMonto').value);
-  const msg = document.getElementById('retirarMessage');
-  if (!monto || monto <= 0) {
-    msg.innerHTML = mostrarAlerta('Monto invalido', 'error');
-    return;
-  }
-  const { data } = await supabaseClient.rpc('retirar_saldo', { p_monto: monto });
-  if (data && data.success) {
-    await crearNotificacion(localStorage.getItem('user_id'), '💸 Retiro exitoso', 'Retiraste ' + formatearDinero(monto), 'success');
-    msg.innerHTML = mostrarAlerta('✅ Retiro exitoso', 'success');
-    await actualizarSaldoSidebar();
-    setTimeout(() => navegarA('flowpay'), 1500);
-  } else {
-    msg.innerHTML = mostrarAlerta('❌ ' + (data ? data.message : 'Error'), 'error');
-  }
-}
-
 async function pagarServicio() {
   const servicio = document.getElementById('servicioNombre').value;
   const monto = parseFloat(document.getElementById('servicioMonto').value);
@@ -474,6 +521,53 @@ async function pagarServicio() {
   } else {
     msg.innerHTML = mostrarAlerta('❌ ' + (data ? data.message : 'Error'), 'error');
   }
+}
+
+// ============ CÓDIGOS DE RETIRO ============
+
+async function generarCodigoRetiro() {
+  const monto = parseFloat(document.getElementById('retiroMonto').value);
+  const msg = document.getElementById('retiroMessage');
+
+  if (!monto || monto < 10000) {
+    msg.innerHTML = mostrarAlerta('Monto minimo: $10.000 COP', 'error');
+    return;
+  }
+
+  msg.innerHTML = '<div class="alert alert-info">Generando codigo...</div>';
+
+  const { data } = await supabaseClient.rpc('generar_codigo_retiro', { p_monto: monto });
+
+  if (data && data.success) {
+    await crearNotificacion(localStorage.getItem('user_id'), '🎫 Codigo de retiro generado', 'Codigo: ' + data.codigo + ' por ' + formatearDinero(monto), 'info');
+    msg.innerHTML = mostrarAlerta('✅ Codigo generado: <strong style="font-family:monospace;">' + data.codigo + '</strong><br>Guardalo y presentalo en un punto autorizado.', 'success');
+    await actualizarSaldoSidebar();
+    setTimeout(() => navegarA('flowpay'), 3000);
+  } else {
+    msg.innerHTML = mostrarAlerta('❌ ' + (data ? data.message : 'Error'), 'error');
+  }
+}
+
+async function validarCodigo(codigoId, codigo) {
+  if (!confirm('¿Confirmas que entregaste el efectivo al cliente?\n\nCodigo: ' + codigo)) {
+    return;
+  }
+
+  const userId = localStorage.getItem('user_id');
+  const { error } = await supabaseClient.from('codigos_retiro').update({
+    estado: 'usado',
+    usado_at: new Date().toISOString(),
+    usado_por: userId,
+  }).eq('id', codigoId);
+
+  if (error) {
+    alert('Error: ' + error.message);
+    return;
+  }
+
+  await crearNotificacion(userId, '✅ Codigo validado', 'Validaste el codigo ' + codigo + ' correctamente', 'success');
+  alert('✅ Codigo validado exitosamente');
+  navegarA('flowpay');
 }
 
 // ============ RECIBO PDF ============
@@ -546,6 +640,7 @@ async function renderFlowCard() {
     : (localStorage.getItem('user_email').split('@')[0]).toUpperCase();
 
   const claseCard = tarjeta.estado === 'activa' ? 'card-credit' : 'card-credit frozen';
+  const deuda = Number(tarjeta.cupo_total) - Number(tarjeta.cupo_disponible);
 
   const html = `
     <div class="${claseCard}">
@@ -564,25 +659,125 @@ async function renderFlowCard() {
 
     <div style="max-width:420px; margin:0 auto;">
       <div class="metrics-grid" style="grid-template-columns:1fr 1fr;">
-        <div class="metric-card"><div class="metric-label">Cupo total</div><div class="metric-value">${formatearDinero(tarjeta.cupo_total)}</div></div>
-        <div class="metric-card"><div class="metric-label">Cupo disponible</div><div class="metric-value">${formatearDinero(tarjeta.cupo_disponible)}</div></div>
+        <div class="metric-card">
+          <div class="metric-label">Cupo total</div>
+          <div class="metric-value">${formatearDinero(tarjeta.cupo_total)}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Cupo disponible</div>
+          <div class="metric-value" style="color:#10B981;">${formatearDinero(tarjeta.cupo_disponible)}</div>
+        </div>
+        <div class="metric-card" style="grid-column: span 2; ${deuda > 0 ? 'border-color:#EF4444; border-width:2px;' : ''}">
+          <div class="metric-label">Deuda actual</div>
+          <div class="metric-value" style="color:${deuda > 0 ? '#EF4444' : '#10B981'};">${formatearDinero(deuda)}</div>
+        </div>
       </div>
+
       <div class="app-section">
         <div class="app-section-title">Estado: ${tarjeta.estado === 'activa' ? '🟢 Activa' : '🔒 Congelada'}</div>
         <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="toggleTarjeta(${tarjeta.id}, '${tarjeta.estado}')">
           ${tarjeta.estado === 'activa' ? '🔒 Congelar tarjeta' : '🔓 Descongelar tarjeta'}
         </button>
       </div>
+
+      <div class="app-tabs">
+        <button class="app-tab active" data-tab="sacar-cupo">💸 Sacar cupo</button>
+        <button class="app-tab" data-tab="pagar-tarjeta">💳 Pagar tarjeta</button>
+      </div>
+
+      <div class="app-tab-content active" id="tab-sacar-cupo">
+        <div class="app-section">
+          <div class="app-section-title">Sacar cupo a tu cuenta</div>
+          <p style="color:#64748B; margin-bottom:16px;">
+            Retira dinero de tu cupo disponible hacia tu saldo principal. Se descuenta del cupo y se suma a tu cuenta.
+          </p>
+          <div class="app-form-group">
+            <label class="app-form-label">Monto a retirar (COP)</label>
+            <input class="app-form-input" type="number" id="montoSacarCupo" min="10000" max="${tarjeta.cupo_disponible}" value="100000">
+            <small style="color:#64748B; font-size:12px;">Cupo disponible: ${formatearDinero(tarjeta.cupo_disponible)}</small>
+          </div>
+          <div id="sacarCupoMessage"></div>
+          <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="sacarCupo()" ${tarjeta.cupo_disponible <= 0 ? 'disabled' : ''}>
+            💸 Sacar cupo
+          </button>
+        </div>
+      </div>
+
+      <div class="app-tab-content" id="tab-pagar-tarjeta">
+        <div class="app-section">
+          <div class="app-section-title">Pagar tarjeta</div>
+          <p style="color:#64748B; margin-bottom:16px;">
+            Paga tu deuda para recuperar cupo disponible. Se descuenta de tu saldo y se suma al cupo.
+          </p>
+          <div class="app-form-group">
+            <label class="app-form-label">Monto a pagar (COP)</label>
+            <input class="app-form-input" type="number" id="montoPagarTarjeta" min="1000" value="${deuda > 0 ? Math.min(deuda, 100000) : 0}">
+            <small style="color:#64748B; font-size:12px;">Deuda actual: ${formatearDinero(deuda)}</small>
+          </div>
+          <div id="pagarTarjetaMessage"></div>
+          <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="pagarTarjeta()" ${deuda <= 0 ? 'disabled' : ''}>
+            💳 Pagar tarjeta
+          </button>
+        </div>
+      </div>
     </div>
   `;
 
   document.getElementById('pageContent').innerHTML = html;
+  activarTabs();
 }
 
 async function toggleTarjeta(id, estadoActual) {
   const nuevoEstado = estadoActual === 'activa' ? 'congelada' : 'activa';
   await supabaseClient.from('tarjetas').update({ estado: nuevoEstado }).eq('id', id);
   navegarA('flowcard');
+}
+
+async function sacarCupo() {
+  const monto = parseFloat(document.getElementById('montoSacarCupo').value);
+  const msg = document.getElementById('sacarCupoMessage');
+
+  if (!monto || monto < 10000) {
+    msg.innerHTML = mostrarAlerta('Monto minimo: $10.000 COP', 'error');
+    return;
+  }
+
+  msg.innerHTML = '<div class="alert alert-info">Procesando...</div>';
+
+  const { data } = await supabaseClient.rpc('usar_cupo_tarjeta', { p_monto: monto });
+
+  if (data && data.success) {
+    await crearNotificacion(localStorage.getItem('user_id'), '💸 Avance de cupo', 'Retiraste ' + formatearDinero(monto) + ' de tu FlowCard a tu cuenta', 'success');
+    msg.innerHTML = mostrarAlerta('✅ Cupo retirado correctamente', 'success');
+    await actualizarSaldoSidebar();
+    setTimeout(() => navegarA('flowcard'), 1500);
+  } else {
+    msg.innerHTML = mostrarAlerta('❌ ' + (data ? data.message : 'Error'), 'error');
+  }
+}
+
+async function pagarTarjeta() {
+  const monto = parseFloat(document.getElementById('montoPagarTarjeta').value);
+  const msg = document.getElementById('pagarTarjetaMessage');
+
+  if (!monto || monto <= 0) {
+    msg.innerHTML = mostrarAlerta('Monto invalido', 'error');
+    return;
+  }
+
+  msg.innerHTML = '<div class="alert alert-info">Procesando...</div>';
+
+  const { data } = await supabaseClient.rpc('pagar_tarjeta', { p_monto: monto });
+
+  if (data && data.success) {
+    const pagoReal = data.pago_real || monto;
+    await crearNotificacion(localStorage.getItem('user_id'), '💳 Pago de tarjeta', 'Pagaste ' + formatearDinero(pagoReal) + ' a tu FlowCard', 'success');
+    msg.innerHTML = mostrarAlerta('✅ Pago realizado: ' + formatearDinero(pagoReal), 'success');
+    await actualizarSaldoSidebar();
+    setTimeout(() => navegarA('flowcard'), 1500);
+  } else {
+    msg.innerHTML = mostrarAlerta('❌ ' + (data ? data.message : 'Error'), 'error');
+  }
 }
 
 // ============ FLOWSAVE ============
@@ -622,7 +817,7 @@ async function renderFlowSave() {
       `;
     });
   } else {
-    html += '<div class="app-section"><p style="color:#64748B;">Aun no tienes metas de ahorro. Crea la primera en la otra pestaña.</p></div>';
+    html += '<div class="app-section"><p style="color:#64748B;">Aun no tienes metas de ahorro.</p></div>';
   }
 
   html += `
@@ -1368,7 +1563,7 @@ async function renderVerificacion() {
       <div class="app-section-title">Verificacion biometrica con camara</div>
       <p style="color:#64748B; margin-bottom:16px;">Toma una foto de tu rostro de frente, con buena luz.</p>
       <div style="text-align:center;">
-        <video id="videoCam" autoplay playsinline></video>
+        <video id="videoCam" autoplay playsinline style="width:100%; max-width:400px; border-radius:16px; background:#000; display:block; margin:0 auto 16px;"></video>
         <canvas id="canvasFoto" style="display:none;"></canvas>
         <div style="margin-top:16px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
           <button class="btn-primary" onclick="iniciarCamara()">📸 Activar camara</button>
@@ -1382,7 +1577,7 @@ async function renderVerificacion() {
       <div class="app-section-title">Codigo de recuperacion</div>
       ${profile?.recovery_code ? `
         <div class="alert alert-warning">Guarda este codigo en un lugar seguro</div>
-        <div style="background:#0F172A; color:#10B981; padding:20px; border-radius:12px; font-family:monospace; font-size:18px; font-weight:700; text-align:center; letter-spacing:2px;">
+        <div style="background:#0F172A; color:#10B981; padding:20px; border-radius:12px; font-family:monospace; font-size:18px; font-weight:700; text-align:center; letter-spacing:2px; word-break:break-all;">
           ${profile.recovery_code}
         </div>
       ` : `
