@@ -662,3 +662,47 @@
     border-radius: 0;
   }
 }
+/* ============ DASHBOARD - PERIOD TOGGLE ============ */
+
+.period-toggle {
+  display: inline-flex;
+  background: #F8FAFC;
+  border-radius: 100px;
+  padding: 4px;
+  gap: 2px;
+}
+
+.period-btn {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748B;
+  padding: 8px 16px;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.period-btn:hover {
+  color: #820AD1;
+}
+
+.period-btn.active {
+  background: #FFFFFF;
+  color: #820AD1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+@media (max-width: 640px) {
+  .period-toggle {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .period-btn {
+    flex: 1;
+    padding: 8px 8px;
+    font-size: 12px;
+  }
+}
