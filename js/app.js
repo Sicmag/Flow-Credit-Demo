@@ -1,6 +1,6 @@
 // ============================================================
-// FlowBank - App Principal (SPA) - Parte 1 de 2
-// Utilidades, navegacion, Dashboard, FlowPay, FlowCard
+// NexusPay - App Principal (SPA) - Parte 1 de 2
+// Utilidades, navegacion, Dashboard, NexusPagos, NexusCard
 // ============================================================
 
 let usuarioActual = null;
@@ -82,18 +82,18 @@ async function navegarA(page) {
   if (sidebar) sidebar.classList.remove('open');
 
   const titulos = {
-  dashboard: ['Dashboard', 'Vista general de tu banco digital'],
-  flowpay: ['NexusPagos', 'Transferencias digitales instantaneas'],
-  flowcard: ['NexusCard', 'Tu tarjeta digital NexusPay'],
-  flowsave: ['NexusSave', 'Ahorro programado para tus metas'],
-  flowinvest: ['NexusInvest', 'Haz crecer tu dinero'],
-  flowshield: ['NexusShield', 'Seguros digitales para emprendedores'],
-  flowbusiness: ['NexusBusiness', 'Cuenta empresarial para tu negocio'],
-  flowanalytics: ['NexusAnalytics', 'Analisis financiero de tu actividad'],
-  creditos: ['NexusCredit', 'Solicita tu credito con IA'],
-  verificacion: ['Verificacion', 'Verifica tu identidad'],
-  notificaciones: ['Notificaciones', 'Todas las alertas de tu cuenta'],
-};
+    dashboard: ['Dashboard', 'Vista general de tu banco digital'],
+    flowpay: ['NexusPagos', 'Transferencias digitales instantaneas'],
+    flowcard: ['NexusCard', 'Tu tarjeta digital NexusPay'],
+    flowsave: ['NexusSave', 'Ahorro programado para tus metas'],
+    flowinvest: ['NexusInvest', 'Haz crecer tu dinero'],
+    flowshield: ['NexusShield', 'Seguros digitales para emprendedores'],
+    flowbusiness: ['NexusBusiness', 'Cuenta empresarial para tu negocio'],
+    flowanalytics: ['NexusAnalytics', 'Analisis financiero de tu actividad'],
+    creditos: ['NexusCredit', 'Solicita tu credito con IA'],
+    verificacion: ['Verificacion', 'Verifica tu identidad'],
+    notificaciones: ['Notificaciones', 'Todas las alertas de tu cuenta'],
+  };
 
   document.getElementById('pageTitle').textContent = titulos[page][0];
   document.getElementById('pageSubtitle').textContent = titulos[page][1];
@@ -135,7 +135,7 @@ async function obtenerSaldo() {
     const { data } = await supabaseClient.from('cuentas').select('saldo').eq('user_id', userId).single();
     if (data) return Number(data.saldo) || 0;
 
-    const numero = 'FC-' + userId.slice(0, 8);
+    const numero = 'NP-' + userId.slice(0, 8);
     const { data: nueva } = await supabaseClient.from('cuentas').insert({
       user_id: userId, numero_cuenta: numero, saldo: 1000000
     }).select().single();
@@ -268,7 +268,7 @@ async function renderDashboard() {
             <span class="badge ${tarjeta.estado === 'activa' ? 'badge-green' : 'badge-red'}">${tarjeta.estado === 'activa' ? '🟢 Activa' : '🔒 Congelada'}</span>
           </div>
           <div style="font-size:12px; color:#64748B; margin-bottom:4px;">Cupo disponible</div>
-          <div style="font-size:22px; font-weight:800; color:#820AD1;">${formatearDinero(tarjeta.cupo_disponible)}</div>
+          <div style="font-size:22px; font-weight:800; color:#2563EB;">${formatearDinero(tarjeta.cupo_disponible)}</div>
           <button class="btn-secondary-sm" style="margin-top:12px;" onclick="navegarA('flowcard')">Ver tarjeta</button>
         ` : `
           <p style="color:#64748B; margin-bottom:12px;">Aun no tienes tarjeta activa.</p>
@@ -336,7 +336,7 @@ async function renderDashboard() {
   document.getElementById('pageContent').innerHTML = html;
 }
 
-// ============ FLOWPAY ============
+// ============ NEXUSPAGOS ============
 
 async function renderFlowPay() {
   const cuenta = await obtenerCuenta();
@@ -444,7 +444,7 @@ async function renderFlowPay() {
           <table class="app-table">
             <thead><tr><th>Codigo</th><th>Monto</th><th>Estado</th><th>Fecha</th></tr></thead>
             <tbody>
-              ${misCodigos.map(c => '<tr><td style="font-family:monospace;font-weight:700;color:#820AD1;">' + c.codigo + '</td><td>' + formatearDinero(c.monto) + '</td><td><span class="badge ' + (c.estado === 'pendiente' ? 'badge-yellow' : 'badge-green') + '">' + c.estado + '</span></td><td>' + formatearFechaCorta(c.created_at) + '</td></tr>').join('')}
+              ${misCodigos.map(c => '<tr><td style="font-family:monospace;font-weight:700;color:#2563EB;">' + c.codigo + '</td><td>' + formatearDinero(c.monto) + '</td><td><span class="badge ' + (c.estado === 'pendiente' ? 'badge-yellow' : 'badge-green') + '">' + c.estado + '</span></td><td>' + formatearFechaCorta(c.created_at) + '</td></tr>').join('')}
             </tbody>
           </table>
         ` : '<p style="color:#64748B;">No has generado codigos de retiro.</p>'}
@@ -483,7 +483,7 @@ async function renderFlowPay() {
             <table class="app-table">
               <thead><tr><th>Codigo</th><th>Cliente</th><th>Monto</th><th></th></tr></thead>
               <tbody>
-                ${codigosPendientes.map(c => '<tr><td style="font-family:monospace;font-weight:700;color:#820AD1;">' + c.codigo + '</td><td>' + c.cliente_email + '</td><td style="font-weight:700;">' + formatearDinero(c.monto) + '</td><td><button class="btn-primary" style="font-size:12px;padding:6px 12px;" onclick="validarCodigo(' + c.id + ', \'' + c.codigo + '\')">✅ Validar</button></td></tr>').join('')}
+                ${codigosPendientes.map(c => '<tr><td style="font-family:monospace;font-weight:700;color:#2563EB;">' + c.codigo + '</td><td>' + c.cliente_email + '</td><td style="font-weight:700;">' + formatearDinero(c.monto) + '</td><td><button class="btn-primary" style="font-size:12px;padding:6px 12px;" onclick="validarCodigo(' + c.id + ', \'' + c.codigo + '\')">✅ Validar</button></td></tr>').join('')}
               </tbody>
             </table>
           ` : '<p style="color:#64748B;">No hay codigos pendientes.</p>'}
@@ -640,13 +640,13 @@ async function generarReciboPDF(transferenciaId) {
   const doc = new jsPDF();
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(130, 10, 209);
-  doc.text('FLOWBANK', 105, 30, { align: 'center' });
+  doc.setTextColor(37, 99, 235);
+  doc.text('NEXUSPAY', 105, 30, { align: 'center' });
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
   doc.setFont('helvetica', 'normal');
   doc.text('Comprobante de Transferencia', 105, 38, { align: 'center' });
-  doc.setDrawColor(130, 10, 209);
+  doc.setDrawColor(37, 99, 235);
   doc.setLineWidth(0.8);
   doc.line(20, 44, 190, 44);
   doc.setFontSize(11);
@@ -657,10 +657,10 @@ async function generarReciboPDF(transferenciaId) {
   doc.text('Receptor: ' + t.receptor_email, 20, 90);
   doc.text('Monto: ' + formatearDinero(t.monto) + ' COP', 20, 100);
   doc.text('Concepto: ' + (t.concepto || 'Sin concepto'), 20, 110);
-  doc.save('recibo_flowbank_' + t.id + '.pdf');
+  doc.save('recibo_nexuspay_' + t.id + '.pdf');
 }
 
-// ============ FLOWCARD ============
+// ============ NEXUSCARD ============
 
 async function renderFlowCard() {
   const userId = localStorage.getItem('user_id');
@@ -687,7 +687,7 @@ async function renderFlowCard() {
   const html = `
     <div class="${claseCard}">
       <div class="card-credit-header">
-        <span class="card-credit-brand">FLOWBANK</span>
+        <span class="card-credit-brand">NEXUSPAY</span>
         <span style="font-size:24px;">💳</span>
       </div>
       <div class="card-credit-numero">${tarjeta.numero}</div>
@@ -797,13 +797,13 @@ async function pagarTarjeta() {
 
 // ⬇️ CONTINUA EN LA PARTE 2 ⬇️
 // ============================================================
-// FlowBank - App Principal (SPA) - Parte 2 de 2
-// FlowSave, FlowInvest, FlowShield, FlowBusiness,
-// FlowAnalytics, Creditos, Contrato PDF, Verificacion,
+// NexusPay - App Principal (SPA) - Parte 2 de 2
+// NexusSave, NexusInvest, NexusShield, NexusBusiness,
+// NexusAnalytics, NexusCredit, Contrato PDF, Verificacion,
 // Notificaciones y Chat de soporte
 // ============================================================
 
-// ============ FLOWSAVE ============
+// ============ NEXUSSAVE ============
 
 async function renderFlowSave() {
   const userId = localStorage.getItem('user_id');
@@ -859,7 +859,7 @@ async function aportarMeta(metaId) {
   navegarA('flowsave');
 }
 
-// ============ FLOWINVEST ============
+// ============ NEXUSINVEST ============
 
 async function renderFlowInvest() {
   const userId = localStorage.getItem('user_id');
@@ -929,7 +929,7 @@ async function crearInversion() {
   navegarA('flowinvest');
 }
 
-// ============ FLOWSHIELD ============
+// ============ NEXUSSHIELD ============
 
 async function renderFlowShield() {
   const userId = localStorage.getItem('user_id');
@@ -982,7 +982,7 @@ async function contratarSeguro() {
   navegarA('flowshield');
 }
 
-// ============ FLOWBUSINESS ============
+// ============ NEXUSBUSINESS ============
 
 async function renderFlowBusiness() {
   const userId = localStorage.getItem('user_id');
@@ -1020,7 +1020,7 @@ async function crearEmpresa() {
   navegarA('flowbusiness');
 }
 
-// ============ FLOWANALYTICS ============
+// ============ NEXUSANALYTICS ============
 
 async function renderFlowAnalytics() {
   const userId = localStorage.getItem('user_id');
@@ -1055,7 +1055,7 @@ async function renderFlowAnalytics() {
   document.getElementById('pageContent').innerHTML = html;
 }
 
-// ============ CREDITOS ============
+// ============ NEXUSCREDIT ============
 
 async function renderCreditos() {
   const userId = localStorage.getItem('user_id');
@@ -1180,14 +1180,13 @@ async function generarContratoPDF(creditoId) {
 
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-doc.setTextColor(37, 99, 235);
-doc.setDrawColor(37, 99, 235);
-doc.text('NEXUSPAY', 105, 30, { align: 'center' });
+  doc.setTextColor(37, 99, 235);
+  doc.text('NEXUSPAY', 105, 20, { align: 'center' });
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
   doc.setFont('helvetica', 'normal');
   doc.text('Contrato de Microcredito Digital', 105, 27, { align: 'center' });
-  doc.setDrawColor(130, 10, 209);
+  doc.setDrawColor(37, 99, 235);
   doc.setLineWidth(0.8);
   doc.line(20, 32, 190, 32);
 
@@ -1266,7 +1265,7 @@ doc.text('NEXUSPAY', 105, 30, { align: 'center' });
   doc.setTextColor(71, 85, 105);
   doc.text('Contrato bajo modalidad de microcredito digital. Prototipo demostrativo. No representa obligacion financiera real.', 20, y);
 
-  doc.save('contrato_flowbank_' + creditoId + '.pdf');
+  doc.save('contrato_nexuspay_' + creditoId + '.pdf');
 }
 
 // ============ VERIFICACION ============
@@ -1415,7 +1414,7 @@ async function enviarChat() {
       body: JSON.stringify({
         tipo: 'chat',
         prompt: [
-          { role: 'system', content: 'Eres el asistente virtual de FlowBank, un banco digital colombiano para emprendedores. Respondes en espanol, amable y conciso (maximo 3 lineas). El usuario se llama ' + nombre + ' y tiene saldo ' + formatearDinero(saldo) + '.' },
+          { role: 'system', content: 'Eres el asistente virtual de NexusPay, un banco digital colombiano para emprendedores. Respondes en espanol, amable y conciso (maximo 3 lineas). El usuario se llama ' + nombre + ' y tiene saldo ' + formatearDinero(saldo) + '.' },
           { role: 'user', content: mensaje }
         ],
       }),
