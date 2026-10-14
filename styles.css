@@ -5,10 +5,13 @@
 }
 
 :root {
-  --purple: #820AD1;
-  --purple-dark: #6B08AE;
-  --purple-light: #A855F7;
+  /* Colores NexusPay */
+  --primary: #2563EB;
+  --primary-dark: #1D4ED8;
+  --primary-light: #60A5FA;
   --green: #10B981;
+  --green-dark: #059669;
+  --green-light: #34D399;
   --red: #EF4444;
   --yellow: #F59E0B;
   --dark: #0F0F1E;
