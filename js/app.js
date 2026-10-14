@@ -82,18 +82,18 @@ async function navegarA(page) {
   if (sidebar) sidebar.classList.remove('open');
 
   const titulos = {
-    dashboard: ['Dashboard', 'Vista general de tu banco digital'],
-    flowpay: ['FlowPay', 'Transferencias digitales instantaneas'],
-    flowcard: ['FlowCard', 'Tu tarjeta digital FlowBank'],
-    flowsave: ['FlowSave', 'Ahorro programado para tus metas'],
-    flowinvest: ['FlowInvest', 'Haz crecer tu dinero'],
-    flowshield: ['FlowShield', 'Seguros digitales para emprendedores'],
-    flowbusiness: ['FlowBusiness', 'Cuenta empresarial para tu negocio'],
-    flowanalytics: ['FlowAnalytics', 'Analisis financiero de tu actividad'],
-    creditos: ['Creditos', 'Solicita tu credito con IA'],
-    verificacion: ['Verificacion', 'Verifica tu identidad'],
-    notificaciones: ['Notificaciones', 'Todas las alertas de tu cuenta'],
-  };
+  dashboard: ['Dashboard', 'Vista general de tu banco digital'],
+  flowpay: ['NexusPagos', 'Transferencias digitales instantaneas'],
+  flowcard: ['NexusCard', 'Tu tarjeta digital NexusPay'],
+  flowsave: ['NexusSave', 'Ahorro programado para tus metas'],
+  flowinvest: ['NexusInvest', 'Haz crecer tu dinero'],
+  flowshield: ['NexusShield', 'Seguros digitales para emprendedores'],
+  flowbusiness: ['NexusBusiness', 'Cuenta empresarial para tu negocio'],
+  flowanalytics: ['NexusAnalytics', 'Analisis financiero de tu actividad'],
+  creditos: ['NexusCredit', 'Solicita tu credito con IA'],
+  verificacion: ['Verificacion', 'Verifica tu identidad'],
+  notificaciones: ['Notificaciones', 'Todas las alertas de tu cuenta'],
+};
 
   document.getElementById('pageTitle').textContent = titulos[page][0];
   document.getElementById('pageSubtitle').textContent = titulos[page][1];
