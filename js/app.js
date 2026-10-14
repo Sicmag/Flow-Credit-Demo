@@ -1,14 +1,11 @@
 // ============================================================
 // FlowBank - App Principal (SPA) - Parte 1 de 2
-// Utilidades, navegacion, Dashboard (con realtime), FlowPay, FlowCard
+// Utilidades, navegacion, Dashboard, FlowPay, FlowCard
 // ============================================================
 
 let usuarioActual = null;
 let datosPersonales = null;
 let streamCamara = null;
-let suscripcionMovimientos = null;
-let graficoDashboard = null;
-let periodoDashboard = '6m'; // '7d' | '30d' | '6m'
 
 // ============ UTILIDADES ============
 
@@ -46,17 +43,6 @@ async function crearNotificacion(userId, titulo, mensaje, tipo) {
   }
 }
 
-function limpiarSuscripcionRealtime() {
-  if (suscripcionMovimientos) {
-    try { supabaseClient.removeChannel(suscripcionMovimientos); } catch (e) {}
-    suscripcionMovimientos = null;
-  }
-  if (graficoDashboard) {
-    try { graficoDashboard.destroy(); } catch (e) {}
-    graficoDashboard = null;
-  }
-}
-
 // ============ INICIALIZACION ============
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -88,10 +74,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 // ============ NAVEGACION ============
 
 async function navegarA(page) {
-  if (page !== 'dashboard') {
-    limpiarSuscripcionRealtime();
-  }
-
   document.querySelectorAll('.sidebar-link').forEach(function (b) { b.classList.remove('active'); });
   const btnActivo = document.querySelector('.sidebar-link[data-page="' + page + '"]');
   if (btnActivo) btnActivo.classList.add('active');
@@ -197,7 +179,7 @@ async function renderDashboard() {
 
   const { data: movimientos } = await supabaseClient
     .from('movimientos').select('*').eq('user_id', userId)
-    .order('created_at', { ascending: false }).limit(500);
+    .order('created_at', { ascending: false }).limit(200);
 
   const { data: tarjeta } = await supabaseClient
     .from('tarjetas').select('*').eq('user_id', userId).maybeSingle();
@@ -226,7 +208,25 @@ async function renderDashboard() {
     if (cuotas && cuotas.length > 0) proximaCuota = cuotas[0];
   }
 
-  const { labels, ingresos, egresos, tituloGrafico } = agruparMovimientos(movimientos || [], periodoDashboard);
+  // Datos del grafico (ultimos 6 meses)
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const hoy = new Date();
+  const labels = [];
+  const ingresos = [];
+  const egresos = [];
+
+  for (let i = 5; i >= 0; i--) {
+    const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    labels.push(meses[fecha.getMonth()]);
+
+    const movsMes = (movimientos || []).filter(m => {
+      const fm = new Date(m.created_at);
+      return fm.getFullYear() === fecha.getFullYear() && fm.getMonth() === fecha.getMonth();
+    });
+
+    ingresos.push(movsMes.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0));
+    egresos.push(movsMes.filter(m => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0));
+  }
 
   const ultimaNotif = notifs && notifs.length > 0 ? notifs[0] : null;
 
@@ -280,30 +280,9 @@ async function renderDashboard() {
     ` : ''}
 
     <div class="app-section">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-        <div class="app-section-title" style="margin:0;">${tituloGrafico}</div>
-        <div class="period-toggle">
-          <button class="period-btn ${periodoDashboard === '7d' ? 'active' : ''}" onclick="cambiarPeriodoDashboard('7d')">7 dias</button>
-          <button class="period-btn ${periodoDashboard === '30d' ? 'active' : ''}" onclick="cambiarPeriodoDashboard('30d')">30 dias</button>
-          <button class="period-btn ${periodoDashboard === '6m' ? 'active' : ''}" onclick="cambiarPeriodoDashboard('6m')">6 meses</button>
-        </div>
-      </div>
+      <div class="app-section-title">Flujo de los ultimos 6 meses</div>
       <div style="position:relative; height:280px;">
         <canvas id="graficoFlujo"></canvas>
-      </div>
-      <div style="display:flex; gap:24px; justify-content:center; margin-top:16px; font-size:13px; flex-wrap:wrap;">
-        <div style="text-align:center;">
-          <div style="color:#64748B;">Total ingresos</div>
-          <div style="font-weight:800; color:#10B981; font-size:16px;">${formatearDinero(ingresos.reduce((s, v) => s + v, 0))}</div>
-        </div>
-        <div style="text-align:center;">
-          <div style="color:#64748B;">Total egresos</div>
-          <div style="font-weight:800; color:#EF4444; font-size:16px;">${formatearDinero(egresos.reduce((s, v) => s + v, 0))}</div>
-        </div>
-        <div style="text-align:center;">
-          <div style="color:#64748B;">Balance</div>
-          <div style="font-weight:800; color:#0F0F1E; font-size:16px;">${formatearDinero(ingresos.reduce((s, v) => s + v, 0) - egresos.reduce((s, v) => s + v, 0))}</div>
-        </div>
       </div>
     </div>
 
@@ -385,8 +364,8 @@ async function renderDashboard() {
 
   const canvas = document.getElementById('graficoFlujo');
   if (canvas && window.Chart) {
-    if (graficoDashboard) { try { graficoDashboard.destroy(); } catch (e) {} }
-    graficoDashboard = new Chart(canvas.getContext('2d'), {
+    const ctx = canvas.getContext('2d');
+    new Chart(ctx, {
       type: 'bar',
       data: {
         labels: labels,
@@ -426,85 +405,12 @@ async function renderDashboard() {
           },
           x: {
             grid: { display: false },
-            ticks: { font: { family: 'Inter', size: 11, weight: '600' } },
+            ticks: { font: { family: 'Inter', size: 12, weight: '600' } },
           },
         },
       },
     });
   }
-
-  // Suscripcion en tiempo real
-  limpiarSuscripcionRealtime();
-  suscripcionMovimientos = supabaseClient
-    .channel('movimientos-dashboard-' + userId)
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'movimientos',
-      filter: 'user_id=eq.' + userId,
-    }, function () {
-      console.log('Nuevo movimiento detectado, recargando dashboard...');
-      renderDashboard();
-    })
-    .subscribe();
-}
-
-// ============ AGRUPACION POR PERIODO ============
-
-function agruparMovimientos(movimientos, periodo) {
-  const hoy = new Date();
-  const labels = [];
-  const ingresos = [];
-  const egresos = [];
-  let tituloGrafico = '';
-
-  if (periodo === '6m') {
-    tituloGrafico = 'Flujo de los ultimos 6 meses';
-    const mesesCortos = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-    for (let i = 5; i >= 0; i--) {
-      const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
-      labels.push(mesesCortos[fecha.getMonth()] + ' ' + String(fecha.getFullYear()).slice(-2));
-
-      const movsMes = movimientos.filter(m => {
-        const fm = new Date(m.created_at);
-        return fm.getFullYear() === fecha.getFullYear() && fm.getMonth() === fecha.getMonth();
-      });
-      ingresos.push(movsMes.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0));
-      egresos.push(movsMes.filter(m => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0));
-    }
-  } else if (periodo === '30d') {
-    tituloGrafico = 'Flujo de los ultimos 30 dias';
-    for (let i = 29; i >= 0; i--) {
-      const fecha = new Date(hoy);
-      fecha.setDate(hoy.getDate() - i);
-      const key = fecha.toISOString().slice(0, 10);
-      labels.push(String(fecha.getDate()).padStart(2, '0') + '/' + String(fecha.getMonth() + 1).padStart(2, '0'));
-
-      const movsDia = movimientos.filter(m => (m.created_at || '').slice(0, 10) === key);
-      ingresos.push(movsDia.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0));
-      egresos.push(movsDia.filter(m => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0));
-    }
-  } else {
-    tituloGrafico = 'Flujo de los ultimos 7 dias';
-    for (let i = 6; i >= 0; i--) {
-      const fecha = new Date(hoy);
-      fecha.setDate(hoy.getDate() - i);
-      const key = fecha.toISOString().slice(0, 10);
-      const diasSemana = ['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
-      labels.push(diasSemana[fecha.getDay()] + ' ' + String(fecha.getDate()).padStart(2, '0'));
-
-      const movsDia = movimientos.filter(m => (m.created_at || '').slice(0, 10) === key);
-      ingresos.push(movsDia.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0));
-      egresos.push(movsDia.filter(m => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0));
-    }
-  }
-
-  return { labels, ingresos, egresos, tituloGrafico };
-}
-
-function cambiarPeriodoDashboard(periodo) {
-  periodoDashboard = periodo;
-  renderDashboard();
 }
 
 // ============ FLOWPAY ============
