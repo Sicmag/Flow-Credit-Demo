@@ -208,26 +208,6 @@ async function renderDashboard() {
     if (cuotas && cuotas.length > 0) proximaCuota = cuotas[0];
   }
 
-  // Datos del grafico (ultimos 6 meses)
-  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const hoy = new Date();
-  const labels = [];
-  const ingresos = [];
-  const egresos = [];
-
-  for (let i = 5; i >= 0; i--) {
-    const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
-    labels.push(meses[fecha.getMonth()]);
-
-    const movsMes = (movimientos || []).filter(m => {
-      const fm = new Date(m.created_at);
-      return fm.getFullYear() === fecha.getFullYear() && fm.getMonth() === fecha.getMonth();
-    });
-
-    ingresos.push(movsMes.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0));
-    egresos.push(movsMes.filter(m => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0));
-  }
-
   const ultimaNotif = notifs && notifs.length > 0 ? notifs[0] : null;
 
   const html = `
@@ -278,13 +258,6 @@ async function renderDashboard() {
         <button class="btn-secondary-sm" onclick="navegarA('notificaciones')">Ver</button>
       </div>
     ` : ''}
-
-    <div class="app-section">
-      <div class="app-section-title">Flujo de los ultimos 6 meses</div>
-      <div style="position:relative; height:280px;">
-        <canvas id="graficoFlujo"></canvas>
-      </div>
-    </div>
 
     <div class="dashboard-grid-2">
       <div class="app-section" style="margin:0;">
@@ -361,56 +334,6 @@ async function renderDashboard() {
   `;
 
   document.getElementById('pageContent').innerHTML = html;
-
-  const canvas = document.getElementById('graficoFlujo');
-  if (canvas && window.Chart) {
-    const ctx = canvas.getContext('2d');
-    new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [
-          { label: 'Ingresos', data: ingresos, backgroundColor: '#10B981', borderRadius: 6 },
-          { label: 'Egresos', data: egresos, backgroundColor: '#EF4444', borderRadius: 6 },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'top',
-            labels: { font: { family: 'Inter', size: 12, weight: '600' }, usePointStyle: true, padding: 16 },
-          },
-          tooltip: {
-            callbacks: {
-              label: function (context) {
-                return context.dataset.label + ': ' + formatearDinero(context.raw);
-              },
-            },
-          },
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              callback: function (value) {
-                if (value >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
-                if (value >= 1000) return '$' + (value / 1000).toFixed(0) + 'k';
-                return '$' + value;
-              },
-              font: { family: 'Inter', size: 11 },
-            },
-            grid: { color: '#F1F5F9' },
-          },
-          x: {
-            grid: { display: false },
-            ticks: { font: { family: 'Inter', size: 12, weight: '600' } },
-          },
-        },
-      },
-    });
-  }
 }
 
 // ============ FLOWPAY ============
