@@ -1435,4 +1435,32 @@ async function enviarChat() {
   }
 }
 
+// ============ MODO OSCURO ============
+
+function aplicarTemaGuardado() {
+  const tema = localStorage.getItem('nexuspay_tema') || 'claro';
+  if (tema === 'oscuro') {
+    document.body.classList.add('dark-mode');
+    actualizarLabelTema();
+  }
+}
+
+function toggleTema() {
+  const activo = document.body.classList.toggle('dark-mode');
+  localStorage.setItem('nexuspay_tema', activo ? 'oscuro' : 'claro');
+  actualizarLabelTema();
+}
+
+function actualizarLabelTema() {
+  const label = document.getElementById('themeToggleLabel');
+  if (!label) return;
+  const esOscuro = document.body.classList.contains('dark-mode');
+  label.textContent = esOscuro ? 'Modo claro' : 'Modo oscuro';
+}
+
+// Aplicar tema al cargar la pagina
+document.addEventListener('DOMContentLoaded', function () {
+  aplicarTemaGuardado();
+});
+
 // ============ FIN DEL ARCHIVO ============
