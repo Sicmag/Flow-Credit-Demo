@@ -596,7 +596,7 @@ body {
   margin-bottom: 20px;
   font-weight: 500;
   display: none;
-}
+
 .form-message.success {
   background: #D1FAE5;
   color: #059669;
@@ -1494,3 +1494,213 @@ body {
   .hero-cta a { justify-content: center; }
   .page-header h1 { font-size: 32px; }
 }
+   
+/* ============================================================
+   MODO OSCURO
+   ============================================================ */
+
+body.dark-mode {
+  --primary: #3B82F6;
+  --primary-dark: #2563EB;
+  --primary-light: #60A5FA;
+  --green: #10B981;
+  --green-dark: #059669;
+  --green-light: #34D399;
+  --red: #F87171;
+  --yellow: #FBBF24;
+  --dark: #F1F5F9;
+  --text: #E2E8F0;
+  --text-light: #94A3B8;
+  --bg-soft: #1E293B;
+  --border: #334155;
+  background: #0F172A;
+  color: #E2E8F0;
+}
+
+body.dark-mode .navbar {
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom-color: #334155;
+}
+body.dark-mode .logo { color: #F1F5F9; }
+body.dark-mode .nav-links a { color: #E2E8F0; }
+body.dark-mode .nav-links a:hover,
+body.dark-mode .nav-links a.active { color: #60A5FA; }
+
+body.dark-mode .hero,
+body.dark-mode .page-header {
+  background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+}
+body.dark-mode .hero h1,
+body.dark-mode .page-header h1,
+body.dark-mode .section-header h2,
+body.dark-mode .stat-value { color: #F1F5F9; }
+body.dark-mode .hero p,
+body.dark-mode .page-header p,
+body.dark-mode .section-header p,
+body.dark-mode .stat-label { color: #94A3B8; }
+
+body.dark-mode .card-mockup {
+  background: #1E293B;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+}
+body.dark-mode .card-amount,
+body.dark-mode .detail-value { color: #F1F5F9; }
+
+body.dark-mode .section-alt { background: #1E293B; }
+body.dark-mode .product-card,
+body.dark-mode .value-card,
+body.dark-mode .team-card {
+  background: #1E293B;
+  border-color: #334155;
+}
+body.dark-mode .product-card h3,
+body.dark-mode .value-card h3,
+body.dark-mode .team-card h3 { color: #F1F5F9; }
+body.dark-mode .product-card p,
+body.dark-mode .value-card p,
+body.dark-mode .team-bio { color: #94A3B8; }
+
+body.dark-mode .contact-info {
+  background: #1E293B;
+}
+body.dark-mode .contact-item strong { color: #F1F5F9; }
+body.dark-mode .contact-icon { background: #0F172A; }
+
+body.dark-mode .form-input,
+body.dark-mode .form-textarea {
+  background: #1E293B;
+  border-color: #334155;
+  color: #E2E8F0;
+}
+body.dark-mode .form-input:focus,
+body.dark-mode .form-textarea:focus {
+  border-color: #3B82F6;
+}
+body.dark-mode .form-label { color: #E2E8F0; }
+
+body.dark-mode .footer {
+  background: #020617;
+}
+
+/* AUTH */
+body.dark-mode .auth-wrapper,
+body.dark-mode .ingresar-wrapper {
+  background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+}
+body.dark-mode .auth-card,
+body.dark-mode .ingresar-card {
+  background: #1E293B;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+}
+body.dark-mode .auth-logo { color: #F1F5F9; }
+body.dark-mode .auth-tabs { background: #0F172A; }
+body.dark-mode .auth-tab.active { background: #1E293B; color: #60A5FA; }
+body.dark-mode .auth-tab { color: #94A3B8; }
+body.dark-mode .ingresar-card h1 { color: #F1F5F9; }
+body.dark-mode .ingresar-card p { color: #94A3B8; }
+body.dark-mode .ingresar-feature { color: #E2E8F0; border-bottom-color: #334155; }
+
+/* APP */
+body.dark-mode .app-sidebar {
+  background: #0F172A;
+  border-right-color: #334155;
+}
+body.dark-mode .sidebar-brand { color: #F1F5F9; }
+body.dark-mode .sidebar-user { background: #1E293B; }
+body.dark-mode .sidebar-user-name { color: #F1F5F9; }
+body.dark-mode .sidebar-user-email { color: #94A3B8; }
+body.dark-mode .sidebar-link { color: #E2E8F0; }
+body.dark-mode .sidebar-link:hover {
+  background: #1E293B;
+  color: #60A5FA;
+}
+body.dark-mode .sidebar-link.active {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60A5FA;
+}
+
+body.dark-mode .app-main { background: #0F172A; }
+body.dark-mode .app-title { color: #F1F5F9; }
+body.dark-mode .app-subtitle { color: #94A3B8; }
+
+body.dark-mode .metric-card,
+body.dark-mode .app-section,
+body.dark-mode .meta-card,
+body.dark-mode .product-item,
+body.dark-mode .notif-item {
+  background: #1E293B;
+  border-color: #334155;
+}
+body.dark-mode .metric-value,
+body.dark-mode .app-section-title,
+body.dark-mode .meta-nombre,
+body.dark-mode .product-item-info h4,
+body.dark-mode .notif-title { color: #F1F5F9; }
+body.dark-mode .metric-label,
+body.dark-mode .notif-message,
+body.dark-mode .product-item-info p { color: #94A3B8; }
+
+body.dark-mode .quick-action {
+  background: #1E293B;
+  border-color: #334155;
+}
+body.dark-mode .quick-action:hover { border-color: #3B82F6; }
+body.dark-mode .quick-action-label { color: #F1F5F9; }
+
+body.dark-mode .app-tabs { border-bottom-color: #334155; }
+body.dark-mode .app-tab { color: #94A3B8; }
+body.dark-mode .app-tab.active { color: #60A5FA; border-bottom-color: #60A5FA; }
+
+body.dark-mode .app-form-input,
+body.dark-mode .app-form-select,
+body.dark-mode .app-form-textarea {
+  background: #0F172A;
+  border-color: #334155;
+  color: #E2E8F0;
+}
+body.dark-mode .app-form-label { color: #E2E8F0; }
+
+body.dark-mode .btn-secondary-sm {
+  background: #1E293B;
+  border-color: #334155;
+  color: #E2E8F0;
+}
+
+body.dark-mode .app-table th { color: #94A3B8; border-bottom-color: #334155; }
+body.dark-mode .app-table td { color: #E2E8F0; border-bottom-color: #1E293B; }
+
+body.dark-mode .chat-window { background: #1E293B; }
+body.dark-mode .chat-messages { background: #0F172A; }
+body.dark-mode .chat-bot {
+  background: #1E293B;
+  border-color: #334155;
+  color: #E2E8F0;
+}
+body.dark-mode .chat-input-wrapper {
+  background: #1E293B;
+  border-top-color: #334155;
+}
+body.dark-mode .chat-input { color: #E2E8F0; }
+
+/* BOTÓN DE TEMA */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: #1E293B;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+.theme-toggle:hover { background: #F8FAFC; color: #2563EB; }
+body.dark-mode .theme-toggle { color: #E2E8F0; }
+body.dark-mode .theme-toggle:hover { background: #1E293B; color: #60A5FA; }
