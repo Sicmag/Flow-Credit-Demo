@@ -5,7 +5,7 @@
 }
 
 :root {
-  /* Colores NexusPay */
+  /* Paleta NexusPay */
   --primary: #2563EB;
   --primary-dark: #1D4ED8;
   --primary-light: #60A5FA;
@@ -62,7 +62,7 @@ body {
   text-decoration: none;
 }
 .logo span {
-  background: linear-gradient(135deg, var(--purple) 0%, var(--purple-light) 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--green) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -79,7 +79,7 @@ body {
   font-size: 15px;
   transition: color 0.2s;
 }
-.nav-links a:hover, .nav-links a.active { color: var(--purple); }
+.nav-links a:hover, .nav-links a.active { color: var(--primary); }
 .menu-toggle {
   display: none;
   background: none;
@@ -98,7 +98,7 @@ body {
 
 /* BUTTONS */
 .btn-primary {
-  background: var(--purple);
+  background: var(--primary);
   color: #FFFFFF;
   padding: 12px 28px;
   border-radius: 100px;
@@ -113,9 +113,9 @@ body {
   cursor: pointer;
 }
 .btn-primary:hover {
-  background: var(--purple-dark);
+  background: var(--primary-dark);
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(130,10,209,0.3);
+  box-shadow: 0 10px 30px rgba(37,99,235,0.3);
 }
 .btn-secondary {
   background: #FFFFFF;
@@ -131,10 +131,10 @@ body {
   align-items: center;
   gap: 8px;
 }
-.btn-secondary:hover { border-color: var(--purple); color: var(--purple); }
+.btn-secondary:hover { border-color: var(--primary); color: var(--primary); }
 .btn-white {
   background: #FFFFFF;
-  color: var(--purple);
+  color: var(--primary);
   padding: 16px 40px;
   border-radius: 100px;
   text-decoration: none;
@@ -156,7 +156,7 @@ body {
 /* HERO */
 .hero {
   padding: 80px 0 100px;
-  background: linear-gradient(180deg, #FFFFFF 0%, #FAF5FF 100%);
+  background: linear-gradient(180deg, #FFFFFF 0%, #EFF6FF 100%);
   position: relative;
   overflow: hidden;
 }
@@ -165,7 +165,7 @@ body {
   position: absolute;
   top: -200px; right: -200px;
   width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(130,10,209,0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%);
   border-radius: 50%;
   pointer-events: none;
 }
@@ -181,8 +181,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  background: rgba(130,10,209,0.08);
-  color: var(--purple);
+  background: rgba(37,99,235,0.08);
+  color: var(--primary);
   padding: 8px 16px;
   border-radius: 100px;
   font-size: 13px;
@@ -191,7 +191,7 @@ body {
 }
 .dot {
   width: 8px; height: 8px;
-  background: var(--purple);
+  background: var(--primary);
   border-radius: 50%;
   animation: pulse 2s infinite;
 }
@@ -208,7 +208,7 @@ body {
   color: var(--dark);
 }
 .gradient-text {
-  background: linear-gradient(135deg, var(--purple) 0%, var(--purple-light) 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--green) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -251,7 +251,7 @@ body {
   align-items: center;
   margin-bottom: 24px;
 }
-.card-brand { font-weight: 900; color: var(--purple); font-size: 14px; letter-spacing: 1px; }
+.card-brand { font-weight: 900; color: var(--primary); font-size: 14px; letter-spacing: 1px; }
 .card-status {
   background: #D1FAE5;
   color: #059669;
@@ -296,13 +296,8 @@ body {
 .stat-label { color: var(--text-light); font-size: 14px; }
 
 /* SECTIONS */
-.section {
-  padding: 100px 0;
-}
-.section-alt {
-  padding: 100px 0;
-  background: var(--bg-soft);
-}
+.section { padding: 100px 0; }
+.section-alt { padding: 100px 0; background: var(--bg-soft); }
 .section-header {
   text-align: center;
   margin-bottom: 60px;
@@ -321,10 +316,9 @@ body {
   margin: 0 auto;
 }
 
-/* PAGE HEADER (para productos, nosotros, contacto) */
 .page-header {
   padding: 80px 0 60px;
-  background: linear-gradient(180deg, #FFFFFF 0%, #FAF5FF 100%);
+  background: linear-gradient(180deg, #FFFFFF 0%, #EFF6FF 100%);
   text-align: center;
 }
 .page-header h1 {
@@ -343,7 +337,7 @@ body {
 
 /* PRODUCTS */
 .product-featured {
-  background: linear-gradient(135deg, var(--dark) 0%, #1E1B4B 100%);
+  background: linear-gradient(135deg, var(--dark) 0%, #1E3A8A 100%);
   border-radius: 24px;
   padding: 60px;
   color: #FFFFFF;
@@ -355,7 +349,7 @@ body {
 }
 .featured-badge {
   display: inline-block;
-  background: linear-gradient(135deg, var(--purple) 0%, var(--purple-light) 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--green) 100%);
   color: #FFFFFF;
   padding: 6px 14px;
   border-radius: 100px;
@@ -388,11 +382,11 @@ body {
 .product-card:hover {
   transform: translateY(-8px);
   box-shadow: 0 20px 60px rgba(15,15,30,0.1);
-  border-color: rgba(130,10,209,0.2);
+  border-color: rgba(37,99,235,0.2);
 }
 .product-icon {
   width: 56px; height: 56px;
-  background: rgba(130,10,209,0.1);
+  background: rgba(37,99,235,0.1);
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -426,7 +420,7 @@ body {
 .step { text-align: center; }
 .step-number {
   width: 64px; height: 64px;
-  background: linear-gradient(135deg, var(--purple) 0%, var(--purple-light) 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--green) 100%);
   color: #FFFFFF;
   border-radius: 20px;
   display: flex;
@@ -435,7 +429,7 @@ body {
   font-size: 24px;
   font-weight: 900;
   margin: 0 auto 24px;
-  box-shadow: 0 10px 30px rgba(130,10,209,0.3);
+  box-shadow: 0 10px 30px rgba(37,99,235,0.3);
 }
 .step h3 { font-size: 20px; font-weight: 800; color: var(--dark); margin-bottom: 12px; }
 .step p { color: var(--text-light); font-size: 15px; }
@@ -458,7 +452,7 @@ body {
 .team-avatar {
   width: 100px; height: 100px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--purple) 0%, var(--purple-light) 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--green) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -468,7 +462,7 @@ body {
   font-weight: 900;
 }
 .team-card h3 { font-size: 20px; font-weight: 800; margin-bottom: 6px; color: var(--dark); }
-.team-role { color: var(--purple); font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.team-role { color: var(--primary); font-size: 14px; font-weight: 600; margin-bottom: 12px; }
 .team-bio { color: var(--text-light); font-size: 14px; }
 
 /* VALUES */
@@ -485,7 +479,7 @@ body {
 }
 .value-icon {
   width: 56px; height: 56px;
-  background: rgba(130,10,209,0.1);
+  background: rgba(37,99,235,0.1);
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -551,8 +545,8 @@ body {
 .form-input:focus,
 .form-textarea:focus {
   outline: none;
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px rgba(130,10,209,0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
 }
 .form-textarea {
   resize: vertical;
@@ -583,7 +577,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 60px 24px;
-  background: linear-gradient(180deg, #FFFFFF 0%, #FAF5FF 100%);
+  background: linear-gradient(180deg, #FFFFFF 0%, #EFF6FF 100%);
 }
 .ingresar-card {
   background: #FFFFFF;
@@ -596,7 +590,7 @@ body {
 }
 .ingresar-icon {
   width: 80px; height: 80px;
-  background: linear-gradient(135deg, var(--purple) 0%, var(--purple-light) 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--green) 100%);
   border-radius: 24px;
   display: flex;
   align-items: center;
@@ -635,7 +629,7 @@ body {
 /* CTA */
 .cta {
   padding: 80px 0;
-  background: linear-gradient(135deg, var(--purple) 0%, var(--purple-dark) 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--green) 100%);
   color: #FFFFFF;
 }
 .cta-content {
@@ -673,7 +667,12 @@ body {
   font-weight: 900;
   margin-bottom: 16px;
 }
-.footer-brand span { color: var(--purple-light); }
+.footer-brand span {
+  background: linear-gradient(135deg, var(--primary-light) 0%, var(--green) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 .footer-desc { font-size: 14px; line-height: 1.7; max-width: 320px; }
 .footer h4 {
   color: #FFFFFF;
@@ -691,7 +690,7 @@ body {
   margin-bottom: 10px;
   transition: color 0.2s;
 }
-.footer a:hover { color: var(--purple-light); }
+.footer a:hover { color: var(--primary-light); }
 .footer-bottom {
   padding-top: 30px;
   border-top: 1px solid rgba(255,255,255,0.1);
