@@ -1,5 +1,6 @@
 // ============================================================
-// FlowBank - App Principal (SPA) - Parte 1/2
+// FlowBank - App Principal (SPA) - Parte 1 de 2
+// Utilidades, navegacion, Dashboard, FlowPay, FlowCard
 // ============================================================
 
 let usuarioActual = null;
@@ -168,9 +169,24 @@ async function renderDashboard() {
   const userId = localStorage.getItem('user_id');
   const saldo = await obtenerSaldo();
 
-  const { data: solicitudes } = await supabaseClient.from('solicitudes').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-  const { data: creditos } = await supabaseClient.from('creditos').select('*').eq('user_id', userId).eq('estado', 'activo');
-  const { data: movimientos } = await supabaseClient.from('movimientos').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(5);
+  const { data: solicitudes } = await supabaseClient
+    .from('solicitudes').select('*').eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  const { data: creditos } = await supabaseClient
+    .from('creditos').select('*').eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  const { data: movimientos } = await supabaseClient
+    .from('movimientos').select('*').eq('user_id', userId)
+    .order('created_at', { ascending: false }).limit(200);
+
+  const { data: tarjeta } = await supabaseClient
+    .from('tarjetas').select('*').eq('user_id', userId).maybeSingle();
+
+  const { data: notifs } = await supabaseClient
+    .from('notificaciones').select('*').eq('user_id', userId)
+    .eq('leida', false).order('created_at', { ascending: false }).limit(1);
 
   let score = 742;
   if (solicitudes && solicitudes.length > 0) {
@@ -178,12 +194,126 @@ async function renderDashboard() {
     if (aprobadas.length > 0) score = aprobadas[0].score;
   }
 
+  const creditosActivos = (creditos || []).filter(c => c.estado === 'activo');
+  const creditosCount = creditosActivos.length;
+
+  let proximaCuota = null;
+  if (creditosActivos.length > 0) {
+    const { data: cuotas } = await supabaseClient
+      .from('cuotas').select('*')
+      .in('credito_id', creditosActivos.map(c => c.id))
+      .eq('estado', 'pendiente')
+      .order('fecha_vencimiento', { ascending: true })
+      .limit(1);
+    if (cuotas && cuotas.length > 0) proximaCuota = cuotas[0];
+  }
+
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const hoy = new Date();
+  const labels = [];
+  const ingresos = [];
+  const egresos = [];
+
+  for (let i = 5; i >= 0; i--) {
+    const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    labels.push(meses[fecha.getMonth()]);
+
+    const movsMes = (movimientos || []).filter(m => {
+      const fm = new Date(m.created_at);
+      return fm.getFullYear() === fecha.getFullYear() && fm.getMonth() === fecha.getMonth();
+    });
+
+    ingresos.push(movsMes.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0));
+    egresos.push(movsMes.filter(m => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0));
+  }
+
+  const ultimaNotif = notifs && notifs.length > 0 ? notifs[0] : null;
+
   const html = `
     <div class="metrics-grid">
-      <div class="metric-card"><div class="metric-label">Saldo disponible</div><div class="metric-value">${formatearDinero(saldo)}</div></div>
-      <div class="metric-card"><div class="metric-label">Score crediticio</div><div class="metric-value">${score}/1000</div></div>
-      <div class="metric-card"><div class="metric-label">Creditos activos</div><div class="metric-value">${creditos ? creditos.length : 0}</div></div>
-      <div class="metric-card"><div class="metric-label">Solicitudes</div><div class="metric-value">${solicitudes ? solicitudes.length : 0}</div></div>
+      <div class="metric-card">
+        <div class="metric-label">Saldo disponible</div>
+        <div class="metric-value">${formatearDinero(saldo)}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Score crediticio</div>
+        <div class="metric-value">${score}/1000</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Creditos activos</div>
+        <div class="metric-value">${creditosCount}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Solicitudes</div>
+        <div class="metric-value">${solicitudes ? solicitudes.length : 0}</div>
+      </div>
+    </div>
+
+    <div class="quick-actions">
+      <button class="quick-action" onclick="navegarA('flowpay')">
+        <div class="quick-action-icon">💸</div>
+        <div class="quick-action-label">Enviar</div>
+      </button>
+      <button class="quick-action" onclick="navegarA('flowpay')">
+        <div class="quick-action-icon">📥</div>
+        <div class="quick-action-label">Recargar</div>
+      </button>
+      <button class="quick-action" onclick="navegarA('creditos')">
+        <div class="quick-action-icon">💳</div>
+        <div class="quick-action-label">Credito</div>
+      </button>
+      <button class="quick-action" onclick="navegarA('flowcard')">
+        <div class="quick-action-icon">🎴</div>
+        <div class="quick-action-label">Tarjeta</div>
+      </button>
+    </div>
+
+    ${ultimaNotif ? `
+      <div class="alert alert-info" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+        <div>
+          <strong>${ultimaNotif.titulo}</strong>
+          <div style="font-size:13px; margin-top:2px;">${ultimaNotif.mensaje}</div>
+        </div>
+        <button class="btn-secondary-sm" onclick="navegarA('notificaciones')">Ver</button>
+      </div>
+    ` : ''}
+
+    <div class="app-section">
+      <div class="app-section-title">Flujo de los ultimos 6 meses</div>
+      <div style="position:relative; height:280px;">
+        <canvas id="graficoFlujo"></canvas>
+      </div>
+    </div>
+
+    <div class="dashboard-grid-2">
+      <div class="app-section" style="margin:0;">
+        <div class="app-section-title">Estado de tu tarjeta</div>
+        ${tarjeta ? `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span style="font-family:monospace; font-size:14px; color:#64748B;">•••• ${String(tarjeta.numero).slice(-4)}</span>
+            <span class="badge ${tarjeta.estado === 'activa' ? 'badge-green' : 'badge-red'}">${tarjeta.estado === 'activa' ? '🟢 Activa' : '🔒 Congelada'}</span>
+          </div>
+          <div style="font-size:12px; color:#64748B; margin-bottom:4px;">Cupo disponible</div>
+          <div style="font-size:22px; font-weight:800; color:#820AD1;">${formatearDinero(tarjeta.cupo_disponible)}</div>
+          <button class="btn-secondary-sm" style="margin-top:12px;" onclick="navegarA('flowcard')">Ver tarjeta</button>
+        ` : `
+          <p style="color:#64748B; margin-bottom:12px;">Aun no tienes tarjeta activa.</p>
+          <button class="btn-primary" style="font-size:14px; padding:10px 20px;" onclick="navegarA('flowcard')">Crear tarjeta</button>
+        `}
+      </div>
+
+      <div class="app-section" style="margin:0;">
+        <div class="app-section-title">Proxima cuota</div>
+        ${proximaCuota ? `
+          <div style="font-size:12px; color:#64748B; margin-bottom:4px;">Vence el ${formatearFechaCorta(proximaCuota.fecha_vencimiento)}</div>
+          <div style="font-size:22px; font-weight:800; color:#0F0F1E;">${formatearDinero(proximaCuota.valor)}</div>
+          <div style="font-size:13px; color:#64748B; margin-top:6px;">Cuota #${proximaCuota.numero}</div>
+          <button class="btn-primary" style="margin-top:12px; font-size:14px; padding:10px 20px;" onclick="navegarA('creditos')">Pagar cuota</button>
+        ` : `
+          <p style="color:#64748B; margin-bottom:12px;">No tienes cuotas pendientes.</p>
+          <button class="btn-primary" style="font-size:14px; padding:10px 20px;" onclick="navegarA('creditos')">Solicitar credito</button>
+        `}
+      </div>
     </div>
 
     <div class="app-section">
@@ -192,7 +322,7 @@ async function renderDashboard() {
         <table class="app-table">
           <thead><tr><th>Fecha</th><th>Descripcion</th><th style="text-align:right;">Monto</th></tr></thead>
           <tbody>
-            ${movimientos.map(m => {
+            ${movimientos.slice(0, 5).map(m => {
               const signo = m.tipo === 'ingreso' ? '+' : '-';
               const clase = m.tipo === 'ingreso' ? 'text-green' : 'text-red';
               return `<tr><td>${formatearFecha(m.created_at)}</td><td>${m.descripcion}</td><td class="${clase}" style="text-align:right;">${signo}${formatearDinero(m.monto)}</td></tr>`;
@@ -230,6 +360,66 @@ async function renderDashboard() {
   `;
 
   document.getElementById('pageContent').innerHTML = html;
+
+  const canvas = document.getElementById('graficoFlujo');
+  if (canvas && window.Chart) {
+    const ctx = canvas.getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Ingresos',
+            data: ingresos,
+            backgroundColor: '#10B981',
+            borderRadius: 6,
+          },
+          {
+            label: 'Egresos',
+            data: egresos,
+            backgroundColor: '#EF4444',
+            borderRadius: 6,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { font: { family: 'Inter', size: 12, weight: '600' }, usePointStyle: true, padding: 16 },
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return context.dataset.label + ': ' + formatearDinero(context.raw);
+              },
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function (value) {
+                if (value >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
+                if (value >= 1000) return '$' + (value / 1000).toFixed(0) + 'k';
+                return '$' + value;
+              },
+              font: { family: 'Inter', size: 11 },
+            },
+            grid: { color: '#F1F5F9' },
+          },
+          x: {
+            grid: { display: false },
+            ticks: { font: { family: 'Inter', size: 12, weight: '600' } },
+          },
+        },
+      },
+    });
+  }
 }
 
 // ============ FLOWPAY ============
@@ -691,11 +881,12 @@ async function pagarTarjeta() {
   }
 }
 
-// ⬇️ AQUI CONTINUA LA PARTE 2 ⬇️
-
-
+// ⬇️ CONTINUA EN LA PARTE 2 ⬇️
 // ============================================================
-// FlowBank - App Principal (SPA) - Parte 2/2
+// FlowBank - App Principal (SPA) - Parte 2 de 2
+// FlowSave, FlowInvest, FlowShield, FlowBusiness,
+// FlowAnalytics, Creditos, Contrato PDF, Verificacion,
+// Notificaciones y Chat de soporte
 // ============================================================
 
 // ============ FLOWSAVE ============
@@ -1024,22 +1215,14 @@ async function solicitarCredito() {
   const prompt = 'Eres un analista de riesgo crediticio. Analiza esta solicitud de microcredito para un emprendedor digital colombiano.\n\nDATOS:\n- Tipo de negocio: ' + datos.tipo + '\n- Ingresos mensuales: ' + datos.ingresos + ' COP\n- Meses con el negocio: ' + datos.meses + '\n- Monto solicitado: ' + datos.monto + ' COP\n- Plazo: ' + datos.plazo + ' dias\n- Historial: ' + datos.historial + '\n\nResponde SOLO con este formato:\nSCORE: <numero 0-1000>\nDECISION: <APROBADO | REVISION | RECHAZADO>\nMONTO_APROBADO: <numero>\nTASA_ANUAL: <numero>\nRAZON_1: <texto>\nRAZON_2: <texto>\nRAZON_3: <texto>';
 
   try {
-    const response = await fetch(CONFIG.URL_GROQ, {
+    const response = await fetch(CONFIG.AI_FUNCTION_URL, {
       method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + CONFIG.GROQ_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: CONFIG.MODELO_GROQ,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 500,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: 'scoring', prompt }),
     });
 
     const result = await response.json();
-    const texto = result.choices[0].message.content;
+    const texto = result.texto;
 
     let score = 0, decision = 'REVISION', montoAprobado = 0, tasa = 18;
     texto.split('\n').forEach(line => {
@@ -1311,25 +1494,20 @@ async function enviarChat() {
     const saldo = await obtenerSaldo();
     const nombre = (datosPersonales && datosPersonales.nombres ? datosPersonales.nombres : 'Usuario');
 
-    const response = await fetch(CONFIG.URL_GROQ, {
+    const response = await fetch(CONFIG.AI_FUNCTION_URL, {
       method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + CONFIG.GROQ_API_KEY,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: CONFIG.MODELO_GROQ,
-        messages: [
+        tipo: 'chat',
+        prompt: [
           { role: 'system', content: 'Eres el asistente virtual de FlowBank, un banco digital colombiano para emprendedores. Respondes en espanol, amable y conciso (maximo 3 lineas). El usuario se llama ' + nombre + ' y tiene saldo ' + formatearDinero(saldo) + '.' },
           { role: 'user', content: mensaje }
         ],
-        temperature: 0.5,
-        max_tokens: 200,
       }),
     });
 
     const result = await response.json();
-    const respuesta = result.choices[0].message.content;
+    const respuesta = result.texto;
 
     const loadingEl = document.getElementById('chatLoading');
     if (loadingEl) loadingEl.remove();
