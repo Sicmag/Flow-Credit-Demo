@@ -1458,9 +1458,6 @@ function actualizarLabelTema() {
   label.textContent = esOscuro ? 'Modo claro' : 'Modo oscuro';
 }
 
-// Aplicar tema al cargar la pagina
-document.addEventListener('DOMContentLoaded', function () {
-  aplicarTemaGuardado();
-});
+
 
 // ============ FIN DEL ARCHIVO ============
