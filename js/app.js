@@ -1180,8 +1180,9 @@ async function generarContratoPDF(creditoId) {
 
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(130, 10, 209);
-  doc.text('FLOWBANK', 105, 20, { align: 'center' });
+doc.setTextColor(37, 99, 235);
+doc.setDrawColor(37, 99, 235);
+doc.text('NEXUSPAY', 105, 30, { align: 'center' });
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
   doc.setFont('helvetica', 'normal');
