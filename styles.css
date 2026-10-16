@@ -2777,4 +2777,247 @@ body.dark-mode .perfil-avatar-edit {
 
 body.dark-mode .perfil-avatar-edit:hover {
   background: #3B82F6;
+} 
+/* ============================================================
+   NEXUSBOX - CAJITAS
+   ============================================================ */
+
+.cajitas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.cajita-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cajita-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(15, 15, 30, 0.1);
+}
+
+.cajita-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cajita-icono {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.cajita-nombre {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--dark);
+}
+
+.cajita-saldo {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--dark);
+  letter-spacing: -0.5px;
+  margin-bottom: 6px;
+}
+
+.cajita-rendimiento {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.cajita-progreso {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.cajita-progreso-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 6px;
+}
+
+.cajita-progreso-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-soft);
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.cajita-progreso-fill {
+  height: 100%;
+  border-radius: 100px;
+  transition: width 0.5s;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 30, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-card {
+  background: var(--bg-card);
+  border-radius: 20px;
+  padding: 24px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 70px rgba(15, 15, 30, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--dark);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 28px;
+  color: var(--text-light);
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.modal-close:hover { background: var(--bg-soft); }
+
+/* Picker de iconos */
+.cajita-iconos-picker {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+}
+
+.cajita-icono-btn {
+  aspect-ratio: 1;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  font-size: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.cajita-icono-btn:hover {
+  border-color: var(--primary);
+  background: var(--bg-soft);
+}
+
+.cajita-icono-btn.selected {
+  border-color: var(--primary);
+  background: rgba(37, 99, 235, 0.1);
+  transform: scale(1.05);
+}
+
+/* Picker de colores */
+.cajita-colores-picker {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cajita-color-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.cajita-color-btn:hover {
+  transform: scale(1.1);
+}
+
+.cajita-color-btn.selected {
+  border-color: var(--dark);
+  transform: scale(1.15);
+  box-shadow: 0 0 0 3px var(--bg-card), 0 0 0 5px currentColor;
+}
+
+/* Modo oscuro */
+body.dark-mode .modal-card { background: #1E293B !important; }
+body.dark-mode .modal-title { color: #F1F5F9 !important; }
+body.dark-mode .cajita-icono-btn {
+  background: #0F172A !important;
+  border-color: #334155 !important;
+}
+body.dark-mode .cajita-icono-btn:hover {
+  border-color: #3B82F6 !important;
+}
+body.dark-mode .cajita-icono-btn.selected {
+  background: rgba(59, 130, 246, 0.2) !important;
+  border-color: #3B82F6 !important;
+}
+body.dark-mode .cajita-color-btn.selected {
+  border-color: #F1F5F9 !important;
+  box-shadow: 0 0 0 3px #1E293B, 0 0 0 5px currentColor;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .cajitas-grid {
+    grid-template-columns: 1fr;
+  }
+  .cajita-iconos-picker {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .modal-card {
+    padding: 20px;
+    border-radius: 16px;
+  }
 }
