@@ -2,148 +2,185 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>NexusPay - Tu banco digital</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
- <link rel="stylesheet" href="styles.css?v=3">
-<link rel="stylesheet" href="css/app.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=10">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
-<body>
+<body class="app-body">
 
-  <div class="app-layout" id="appLayout">
+  <!-- ============ TOPBAR ============ -->
+  <header class="app-topbar">
+    <a href="app.html" class="topbar-logo">
+      <span class="logo-icon">🛡️</span>
+      <span class="logo-text">Nexus<span>Pay</span></span>
+    </a>
 
-    <aside class="app-sidebar" id="appSidebar">
-      <a href="index.html" class="sidebar-brand">Nexus<span>Pay</span></a>
+    <button class="menu-btn" id="menuBtn" aria-label="Abrir menu" onclick="toggleMenu()">
+      <span class="menu-btn-line"></span>
+      <span class="menu-btn-line"></span>
+      <span class="menu-btn-line"></span>
+    </button>
+  </header>
 
-      <div class="sidebar-user">
-        <div class="sidebar-user-name" id="sidebarNombre">Cargando...</div>
-        <div class="sidebar-user-email" id="sidebarEmail">...</div>
-        <div class="sidebar-user-saldo" id="sidebarSaldo">$0</div>
-      </div>
+  <!-- ============ MENU FULLSCREEN ============ -->
+  <nav class="app-menu" id="appMenu">
+    <div class="menu-content">
 
-      <nav class="sidebar-nav">
-        <button class="sidebar-link active" data-page="dashboard">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
-          Dashboard
-        </button>
-        <button class="sidebar-link" data-page="flowpay">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-          NexusPagos
-        </button>
-        <button class="sidebar-link" data-page="flowcard">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-          NexusCard
-        </button>
-        <button class="sidebar-link" data-page="flowsave">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg>
-          NexusSave
-        </button>
-        <button class="sidebar-link" data-page="flowinvest">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
-          NexusInvest
-        </button>
-        <button class="sidebar-link" data-page="flowshield">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-          NexusShield
-        </button>
-        <button class="sidebar-link" data-page="flowbusiness">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-4"></path></svg>
-          NexusBusiness
-        </button>
-        <button class="sidebar-link" data-page="flowanalytics">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-          NexusAnalytics
-        </button>
-        <button class="sidebar-link" data-page="creditos">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
-          NexusCredit
-        </button>
-        <button class="sidebar-link" data-page="verificacion">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"></path><circle cx="12" cy="12" r="10"></circle></svg>
-          Verificacion
-        </button>
-        <button class="sidebar-link" data-page="notificaciones">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-          Notificaciones
-        </button>
-
-        <a href="privacidad.html" target="_blank" class="sidebar-link" style="text-decoration:none;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-          Privacidad
-        </a>
-
-        <a href="terminos.html" target="_blank" class="sidebar-link" style="text-decoration:none;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-          Terminos
-        </a>
-      </nav>
-
-      <div style="margin-top:24px; padding-top:16px; border-top:1px solid #E2E8F0;">
-  <button class="theme-toggle" onclick="toggleTema()" id="themeToggleBtn">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-    <span id="themeToggleLabel">Modo oscuro</span>
-  </button>
-
-  <button class="sidebar-link" onclick="cerrarSesion()" style="color:#EF4444;">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-    Cerrar sesion
-  </button>
-</div>
-    </aside>
-
-    <main class="app-main">
-
-      <div class="app-header">
-        <button class="menu-mobile-toggle" id="menuMobileToggle">☰</button>
-        <div>
-          <div class="app-title" id="pageTitle">Dashboard</div>
-          <div class="app-subtitle" id="pageSubtitle">Vista general de tu banco digital</div>
+      <!-- Perfil -->
+      <div class="menu-profile">
+        <div class="menu-avatar" id="menuAvatar">👤</div>
+        <div class="menu-profile-info">
+          <div class="menu-profile-name" id="menuNombre">Cargando...</div>
+          <div class="menu-profile-email" id="menuEmail">...</div>
+          <div class="menu-profile-saldo" id="menuSaldo">$0</div>
         </div>
       </div>
 
-      <div id="pageContent">
-        <div class="loading-spinner"></div>
+      <!-- Cuenta -->
+      <div class="menu-section">
+        <div class="menu-section-title">Cuenta</div>
+        <div class="menu-links">
+          <button class="menu-link" data-page="perfil" onclick="navegarA('perfil')">
+            <span class="menu-link-icon">👤</span>
+            <span class="menu-link-label">Mi perfil</span>
+          </button>
+          <button class="menu-link" data-page="verificacion" onclick="navegarA('verificacion')">
+            <span class="menu-link-icon">✓</span>
+            <span class="menu-link-label">Verificación</span>
+          </button>
+          <button class="menu-link" data-page="notificaciones" onclick="navegarA('notificaciones')">
+            <span class="menu-link-icon">🔔</span>
+            <span class="menu-link-label">Notificaciones</span>
+          </button>
+          <button class="menu-link" onclick="toggleTema()">
+            <span class="menu-link-icon" id="themeIcon">🌙</span>
+            <span class="menu-link-label" id="themeToggleLabel">Modo oscuro</span>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Productos -->
+      <div class="menu-section">
+        <div class="menu-section-title">Productos</div>
+        <div class="menu-links">
+          <button class="menu-link" data-page="dashboard" onclick="navegarA('dashboard')">
+            <span class="menu-link-icon">📊</span>
+            <span class="menu-link-label">Dashboard</span>
+          </button>
+          <button class="menu-link" data-page="flowpay" onclick="navegarA('flowpay')">
+            <span class="menu-link-icon">💸</span>
+            <span class="menu-link-label">NexusPagos</span>
+          </button>
+          <button class="menu-link" data-page="flowcard" onclick="navegarA('flowcard')">
+            <span class="menu-link-icon">🎴</span>
+            <span class="menu-link-label">NexusCard</span>
+          </button>
+          <button class="menu-link" data-page="flowsave" onclick="navegarA('flowsave')">
+            <span class="menu-link-icon">🏦</span>
+            <span class="menu-link-label">NexusSave</span>
+          </button>
+          <button class="menu-link" data-page="flowinvest" onclick="navegarA('flowinvest')">
+            <span class="menu-link-icon">📈</span>
+            <span class="menu-link-label">NexusInvest</span>
+          </button>
+          <button class="menu-link" data-page="flowshield" onclick="navegarA('flowshield')">
+            <span class="menu-link-icon">🛡️</span>
+            <span class="menu-link-label">NexusShield</span>
+          </button>
+          <button class="menu-link" data-page="flowbusiness" onclick="navegarA('flowbusiness')">
+            <span class="menu-link-icon">💼</span>
+            <span class="menu-link-label">NexusBusiness</span>
+          </button>
+          <button class="menu-link" data-page="flowanalytics" onclick="navegarA('flowanalytics')">
+            <span class="menu-link-icon">📊</span>
+            <span class="menu-link-label">NexusAnalytics</span>
+          </button>
+          <button class="menu-link" data-page="creditos" onclick="navegarA('creditos')">
+            <span class="menu-link-icon">💳</span>
+            <span class="menu-link-label">NexusCredit</span>
+          </button>
+        </div>
       </div>
 
-    </main>
+      
 
-  </div>
+      <!-- Info -->
+      <div class="menu-section">
+        <div class="menu-section-title">Información</div>
+        <div class="menu-links">
+          <a href="privacidad.html" target="_blank" class="menu-link">
+            <span class="menu-link-icon">🔒</span>
+            <span class="menu-link-label">Privacidad</span>
+          </a>
+          <a href="terminos.html" target="_blank" class="menu-link">
+            <span class="menu-link-icon">📄</span>
+            <span class="menu-link-label">Términos</span>
+          </a>
+        </div>
+      </div>
 
-  <button class="chat-fab" id="chatFab" onclick="toggleChat()">💬</button>
+      <!-- Cerrar sesión -->
+      <div class="menu-section">
+        <button class="menu-link menu-link-danger" onclick="cerrarSesion()">
+          <span class="menu-link-icon">🚪</span>
+          <span class="menu-link-label">Cerrar sesión</span>
+        </button>
+      </div>
 
+      <!-- Footer del menú -->
+      <div class="menu-footer">
+        <div class="menu-footer-brand">NexusPay · 2026</div>
+        <div class="menu-footer-sub">Proyecto SENA</div>
+      </div>
+
+    </div>
+  </nav>
+
+  <!-- ============ CONTENIDO PRINCIPAL ============ -->
+  <main class="app-content">
+    <div class="page-header-app">
+      <h1 class="page-title" id="pageTitle">Dashboard</h1>
+      <p class="page-subtitle" id="pageSubtitle">Vista general de tu banco digital</p>
+    </div>
+    <div id="pageContent">
+      <div class="loading-spinner"></div>
+    </div>
+  </main>
+
+  <!-- ============ FAB CHAT LUCI ============ -->
+  <button class="chat-fab" id="chatFab" onclick="toggleChat()" aria-label="Chat con Luci">💬</button>
+
+  <!-- ============ CHAT WINDOW ============ -->
   <div class="chat-window" id="chatWindow">
-  <div class="chat-header">
-    <div>
-      <div style="font-weight:700;" id="chatHeaderNombre">Luci · Asistente virtual de NexusPay</div>
-      <div style="font-size:12px; color:#DBEAFE;">En linea</div>
+    <div class="chat-header">
+      <div class="chat-header-info">
+        <div class="chat-header-name">Luci</div>
+        <div class="chat-header-status">En línea</div>
+      </div>
+      <button class="chat-close" onclick="toggleChat()">×</button>
     </div>
-    <button onclick="toggleChat()" style="background:none; border:none; color:#FFFFFF; cursor:pointer; font-size:22px;">×</button>
-  </div>
-  <div class="chat-messages" id="chatMessages">
-    <div class="chat-message chat-bot" id="chatSaludoInicial">
-      Hola! Soy Luci, tu asistente de NexusPay. ¿En qué te ayudo hoy?
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-message chat-bot">
+        Hola! Soy Luci, tu asistente de NexusPay. ¿En qué te ayudo hoy? 💜
+      </div>
+    </div>
+    <div class="chat-input-wrapper">
+      <input class="chat-input" id="chatInput" placeholder="Escribe tu pregunta..." onkeypress="if(event.key==='Enter') enviarChat()">
+      <button class="chat-send" onclick="enviarChat()">➤</button>
     </div>
   </div>
-  <div class="chat-input-wrapper">
-    <input class="chat-input" id="chatInput" placeholder="Escribe tu pregunta..." onkeypress="if(event.key==='Enter') enviarChat()">
-    <button class="chat-send" onclick="enviarChat()">➤</button>
-  </div>
-</div>
 
-    <script src="js/config.js"></script>
-<script src="js/supabase-client.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/theme.js"></script>
-<script src="js/toast.js"></script>
-<script src="js/app.js"></script>
-<script src="js/loader.js"></script>
-  <script src="script.js"></script>
-</body>
-</body>
-
-</body>
+  <!-- ============ SCRIPTS ============ -->
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/toast.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/loader.js"></script>
 </body>
 </html>
