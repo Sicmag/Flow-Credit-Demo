@@ -1,11 +1,12 @@
 // ============================================================
 // NexusPay - App Principal (SPA) - Parte 1 de 2
-// Utilidades, navegacion, Dashboard, NexusPagos, NexusCard
+// Utilidades, menú, Dashboard, NexusPagos, NexusCard, Perfil
 // ============================================================
 
 let usuarioActual = null;
 let datosPersonales = null;
 let streamCamara = null;
+let chatHistorial = [];
 
 // ============ UTILIDADES ============
 
@@ -30,6 +31,12 @@ function mostrarAlerta(msg, tipo) {
   return '<div class="alert alert-' + tipo + '">' + msg + '</div>';
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
+}
+
 async function crearNotificacion(userId, titulo, mensaje, tipo) {
   try {
     await supabaseClient.from('notificaciones').insert({
@@ -52,34 +59,116 @@ document.addEventListener('DOMContentLoaded', async function () {
   usuarioActual = session.user;
   datosPersonales = await obtenerDatosUsuario();
 
-  await cargarSidebar();
+  await cargarMenuPerfil();
+  actualizarIconoTema();
 
-  document.querySelectorAll('.sidebar-link[data-page]').forEach(function (btn) {
+  document.querySelectorAll('.menu-link[data-page]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       navegarA(btn.getAttribute('data-page'));
     });
   });
 
-  const toggle = document.getElementById('menuMobileToggle');
-  const sidebar = document.getElementById('appSidebar');
-  if (toggle && sidebar) {
-    toggle.addEventListener('click', function () {
-      sidebar.classList.toggle('open');
-    });
-  }
-
   navegarA('dashboard');
 });
+
+// ============ MENU FULLSCREEN ============
+
+function toggleMenu() {
+  const menu = document.getElementById('appMenu');
+  const btn = document.getElementById('menuBtn');
+  const fab = document.getElementById('chatFab');
+  if (!menu) return;
+
+  const abierto = menu.classList.toggle('abierto');
+  if (btn) btn.classList.toggle('abierto', abierto);
+  if (fab) fab.classList.toggle('oculto', abierto);
+
+  document.body.style.overflow = abierto ? 'hidden' : '';
+}
+
+function cerrarMenu() {
+  const menu = document.getElementById('appMenu');
+  const btn = document.getElementById('menuBtn');
+  const fab = document.getElementById('chatFab');
+  if (!menu) return;
+
+  menu.classList.remove('abierto');
+  if (btn) btn.classList.remove('abierto');
+  if (fab) fab.classList.remove('oculto');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('appMenu');
+  const btn = document.getElementById('menuBtn');
+  if (!menu || !menu.classList.contains('abierto')) return;
+  if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
+  cerrarMenu();
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    cerrarMenu();
+    const chat = document.getElementById('chatWindow');
+    if (chat && chat.classList.contains('open')) chat.classList.remove('open');
+  }
+});
+
+async function cargarMenuPerfil() {
+  const email = localStorage.getItem('user_email') || '';
+  let nombre = email.split('@')[0];
+  if (datosPersonales && datosPersonales.nombres) {
+    nombre = (datosPersonales.nombres + ' ' + (datosPersonales.apellidos || '')).trim();
+  }
+
+  const menuNombre = document.getElementById('menuNombre');
+  const menuEmail = document.getElementById('menuEmail');
+  const menuSaldo = document.getElementById('menuSaldo');
+  const menuAvatar = document.getElementById('menuAvatar');
+
+  if (menuNombre) menuNombre.textContent = nombre;
+  if (menuEmail) menuEmail.textContent = email;
+
+  // Avatar con foto si existe
+  if (menuAvatar) {
+    const userId = localStorage.getItem('user_id');
+    try {
+      const { data: profile } = await supabaseClient
+        .from('profiles').select('foto_perfil_url').eq('id', userId).single();
+
+      if (profile && profile.foto_perfil_url) {
+        menuAvatar.innerHTML = '<img src="' + profile.foto_perfil_url + '" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+      } else {
+        const inicial = nombre.charAt(0).toUpperCase() || '👤';
+        menuAvatar.textContent = inicial;
+      }
+    } catch (e) {
+      const inicial = nombre.charAt(0).toUpperCase() || '👤';
+      menuAvatar.textContent = inicial;
+    }
+  }
+
+  const saldo = await obtenerSaldo();
+  if (menuSaldo) menuSaldo.textContent = formatearDinero(saldo);
+}
+
+function actualizarIconoTema() {
+  const icon = document.getElementById('themeIcon');
+  const label = document.getElementById('themeToggleLabel');
+  if (!icon || !label) return;
+  const esOscuro = document.body.classList.contains('dark-mode');
+  icon.textContent = esOscuro ? '☀️' : '🌙';
+  label.textContent = esOscuro ? 'Modo claro' : 'Modo oscuro';
+}
 
 // ============ NAVEGACION ============
 
 async function navegarA(page) {
-  document.querySelectorAll('.sidebar-link').forEach(function (b) { b.classList.remove('active'); });
-  const btnActivo = document.querySelector('.sidebar-link[data-page="' + page + '"]');
-  if (btnActivo) btnActivo.classList.add('active');
+  cerrarMenu();
 
-  const sidebar = document.getElementById('appSidebar');
-  if (sidebar) sidebar.classList.remove('open');
+  document.querySelectorAll('.menu-link').forEach(function (b) { b.classList.remove('active'); });
+  const linkActivo = document.querySelector('.menu-link[data-page="' + page + '"]');
+  if (linkActivo) linkActivo.classList.add('active');
 
   const titulos = {
     dashboard: ['Dashboard', 'Vista general de tu banco digital'],
@@ -91,6 +180,7 @@ async function navegarA(page) {
     flowbusiness: ['NexusBusiness', 'Cuenta empresarial para tu negocio'],
     flowanalytics: ['NexusAnalytics', 'Analisis financiero de tu actividad'],
     creditos: ['NexusCredit', 'Solicita tu credito con IA'],
+    perfil: ['Mi perfil', 'Administra tu informacion personal'],
     verificacion: ['Verificacion', 'Verifica tu identidad'],
     notificaciones: ['Notificaciones', 'Todas las alertas de tu cuenta'],
   };
@@ -112,6 +202,7 @@ async function navegarA(page) {
       case 'flowbusiness': await renderFlowBusiness(); break;
       case 'flowanalytics': await renderFlowAnalytics(); break;
       case 'creditos': await renderCreditos(); break;
+      case 'perfil': await renderPerfil(); break;
       case 'verificacion': await renderVerificacion(); break;
       case 'notificaciones': await renderNotificaciones(); break;
       default: content.innerHTML = '<p>Pagina no encontrada</p>';
@@ -124,7 +215,8 @@ async function navegarA(page) {
 
 async function actualizarSaldoSidebar() {
   const saldo = await obtenerSaldo();
-  document.getElementById('sidebarSaldo').textContent = formatearDinero(saldo);
+  const menuSaldo = document.getElementById('menuSaldo');
+  if (menuSaldo) menuSaldo.textContent = formatearDinero(saldo);
 }
 
 // ============ DATOS ============
@@ -149,18 +241,6 @@ async function obtenerCuenta() {
   const userId = localStorage.getItem('user_id');
   const { data } = await supabaseClient.from('cuentas').select('*').eq('user_id', userId).single();
   return data;
-}
-
-async function cargarSidebar() {
-  const email = localStorage.getItem('user_email');
-  let nombreCompleto = email.split('@')[0];
-  if (datosPersonales && datosPersonales.nombres) {
-    nombreCompleto = (datosPersonales.nombres + ' ' + (datosPersonales.apellidos || '')).trim();
-  }
-  document.getElementById('sidebarNombre').textContent = nombreCompleto;
-  document.getElementById('sidebarEmail').textContent = email;
-  const saldo = await obtenerSaldo();
-  document.getElementById('sidebarSaldo').textContent = formatearDinero(saldo);
 }
 
 // ============ DASHBOARD ============
@@ -336,6 +416,348 @@ async function renderDashboard() {
   document.getElementById('pageContent').innerHTML = html;
 }
 
+// ============ PERFIL DE USUARIO ============
+
+async function renderPerfil() {
+  const userId = localStorage.getItem('user_id');
+  const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
+  const email = localStorage.getItem('user_email');
+
+  const nombre = profile?.nombres || '';
+  const apellidos = profile?.apellidos || '';
+  const cedula = profile?.cedula || '';
+  const telefono = profile?.telefono || '';
+  const fotoUrl = profile?.foto_perfil_url || '';
+
+  const inicial = (nombre.charAt(0) || email.charAt(0) || 'U').toUpperCase();
+
+  const html = `
+    <div class="app-section" style="text-align:center;">
+      <div style="position:relative; display:inline-block; margin-bottom:16px;">
+        <div class="perfil-avatar" id="perfilAvatar">
+          ${fotoUrl
+            ? '<img src="' + fotoUrl + '" alt="Avatar">'
+            : '<span>' + inicial + '</span>'}
+        </div>
+        <button class="perfil-avatar-edit" onclick="document.getElementById('fotoInput').click()" title="Cambiar foto">
+          📷
+        </button>
+        <input type="file" id="fotoInput" accept="image/*" style="display:none;" onchange="subirFotoPerfil(event)">
+      </div>
+
+      <div style="font-size:22px; font-weight:800; color:var(--dark); margin-bottom:4px;">
+        ${(nombre + ' ' + apellidos).trim() || 'Sin nombre'}
+      </div>
+      <div style="font-size:14px; color:var(--text-light); margin-bottom:16px;">
+        ${email}
+      </div>
+      ${profile?.email_verificado
+        ? '<span class="badge badge-green">✓ Correo verificado</span>'
+        : '<span class="badge badge-yellow">⚠️ Correo sin verificar</span>'}
+    </div>
+
+    <div class="app-section">
+      <div class="app-section-title">Informacion personal</div>
+
+      <div class="app-form-group">
+        <label class="app-form-label">Nombres</label>
+        <input class="app-form-input" type="text" id="perfilNombres" value="${escapeHtml(nombre)}" placeholder="Tus nombres">
+      </div>
+
+      <div class="app-form-group">
+        <label class="app-form-label">Apellidos</label>
+        <input class="app-form-input" type="text" id="perfilApellidos" value="${escapeHtml(apellidos)}" placeholder="Tus apellidos">
+      </div>
+
+      <div class="app-form-group">
+        <label class="app-form-label">Cedula</label>
+        <input class="app-form-input" type="text" id="perfilCedula" value="${escapeHtml(cedula)}" placeholder="Numero de cedula">
+      </div>
+
+      <div class="app-form-group">
+        <label class="app-form-label">Telefono</label>
+        <input class="app-form-input" type="tel" id="perfilTelefono" value="${escapeHtml(telefono)}" placeholder="+57 300 000 0000">
+      </div>
+
+      <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="guardarDatosPerfil()">
+        💾 Guardar cambios
+      </button>
+    </div>
+
+    <div class="app-section">
+      <div class="app-section-title">Correo electronico</div>
+
+      <div class="app-form-group">
+        <label class="app-form-label">Correo actual</label>
+        <input class="app-form-input" type="email" value="${email}" disabled style="opacity:0.7;">
+      </div>
+
+      <div class="app-form-group">
+        <label class="app-form-label">Nuevo correo (opcional)</label>
+        <input class="app-form-input" type="email" id="perfilNuevoEmail" placeholder="nuevo@correo.com">
+      </div>
+
+      <button class="btn-secondary" style="width:100%; justify-content:center;" onclick="solicitarCambioEmail()">
+        📧 Enviar codigo de verificacion
+      </button>
+
+      <div id="codigoVerificacionBox" style="display:none; margin-top:16px;">
+        <div class="app-form-group">
+          <label class="app-form-label">Codigo de 6 digitos</label>
+          <input class="app-form-input" type="text" id="perfilCodigo" maxlength="6" placeholder="123456" style="text-align:center; font-size:20px; letter-spacing:4px; font-weight:700;">
+        </div>
+        <button class="btn-primary" style="width:100%; justify-content:center;" onclick="verificarCodigoEmail()">
+          ✅ Verificar y cambiar correo
+        </button>
+      </div>
+    </div>
+
+    <div class="app-section">
+      <div class="app-section-title">Seguridad</div>
+
+      <button class="btn-secondary" style="width:100%; justify-content:center; margin-bottom:12px;" onclick="mostrarCambioPassword()">
+        🔒 Cambiar contrasena
+      </button>
+
+      <div id="cambioPasswordBox" style="display:none; margin-top:12px;">
+        <div class="app-form-group">
+          <label class="app-form-label">Nueva contrasena</label>
+          <input class="app-form-input" type="password" id="perfilNuevaPassword" placeholder="Minimo 8 caracteres">
+        </div>
+        <div class="app-form-group">
+          <label class="app-form-label">Confirmar contrasena</label>
+          <input class="app-form-input" type="password" id="perfilNuevaPassword2" placeholder="Repite la contrasena">
+        </div>
+        <button class="btn-primary" style="width:100%; justify-content:center;" onclick="cambiarPassword()">
+          Guardar nueva contrasena
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('pageContent').innerHTML = html;
+}
+
+async function guardarDatosPerfil() {
+  const userId = localStorage.getItem('user_id');
+  const nombres = document.getElementById('perfilNombres').value.trim();
+  const apellidos = document.getElementById('perfilApellidos').value.trim();
+  const cedula = document.getElementById('perfilCedula').value.trim();
+  const telefono = document.getElementById('perfilTelefono').value.trim();
+
+  if (!nombres || !apellidos) {
+    if (window.toast) toast.error('Faltan datos', 'Nombres y apellidos son obligatorios');
+    return;
+  }
+
+  if (window.toast) toast.info('Guardando...', 'Actualizando tu perfil');
+
+  const { error } = await supabaseClient.from('profiles').update({
+    nombres: nombres,
+    apellidos: apellidos,
+    cedula: cedula,
+    telefono: telefono,
+  }).eq('id', userId);
+
+  if (error) {
+    if (window.toast) toast.error('Error', error.message);
+    return;
+  }
+
+  datosPersonales = { nombres, apellidos, cedula, telefono };
+  await cargarMenuPerfil();
+
+  if (window.toast) toast.success('Perfil actualizado', 'Tus datos fueron guardados');
+  renderPerfil();
+}
+
+async function subirFotoPerfil(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (file.size > 2 * 1024 * 1024) {
+    if (window.toast) toast.error('Imagen muy grande', 'Maximo 2 MB');
+    return;
+  }
+
+  if (!file.type.startsWith('image/')) {
+    if (window.toast) toast.error('Formato invalido', 'Debe ser una imagen');
+    return;
+  }
+
+  const userId = localStorage.getItem('user_id');
+  if (window.toast) toast.info('Subiendo...', 'Guardando tu foto de perfil');
+
+  try {
+    const extension = file.name.split('.').pop() || 'jpg';
+    const fileName = 'perfil_' + userId + '_' + Date.now() + '.' + extension;
+
+    const { error } = await supabaseClient.storage
+      .from('verificaciones')
+      .upload(fileName, file, { contentType: file.type, upsert: true });
+
+    if (error) throw new Error(error.message);
+
+    const { data: publicData } = supabaseClient.storage
+      .from('verificaciones')
+      .getPublicUrl(fileName);
+
+    const { error: errUpdate } = await supabaseClient.from('profiles').update({
+      foto_perfil_url: publicData.publicUrl,
+    }).eq('id', userId);
+
+    if (errUpdate) throw new Error(errUpdate.message);
+
+    const menuAvatar = document.getElementById('menuAvatar');
+    if (menuAvatar) {
+      menuAvatar.innerHTML = '<img src="' + publicData.publicUrl + '" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+    }
+
+    if (window.toast) toast.success('Foto actualizada', 'Tu nuevo avatar esta listo');
+    renderPerfil();
+
+  } catch (e) {
+    console.error('Error subiendo foto:', e);
+    if (window.toast) toast.error('Error', e.message);
+  }
+}
+
+async function solicitarCambioEmail() {
+  const nuevoEmail = document.getElementById('perfilNuevoEmail').value.trim().toLowerCase();
+  const emailActual = localStorage.getItem('user_email');
+
+  if (!nuevoEmail) {
+    if (window.toast) toast.error('Falta correo', 'Escribe el nuevo correo');
+    return;
+  }
+
+  if (!nuevoEmail.includes('@') || !nuevoEmail.includes('.')) {
+    if (window.toast) toast.error('Correo invalido', 'Escribe un correo valido');
+    return;
+  }
+
+  if (nuevoEmail === emailActual) {
+    if (window.toast) toast.error('Mismo correo', 'Escribe uno distinto al actual');
+    return;
+  }
+
+  const codigo = String(Math.floor(100000 + Math.random() * 900000));
+  const expiraAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+  const userId = localStorage.getItem('user_id');
+
+  const { error } = await supabaseClient.from('profiles').update({
+    email_pendiente: nuevoEmail,
+    codigo_verificacion: codigo,
+    codigo_expira_at: expiraAt,
+  }).eq('id', userId);
+
+  if (error) {
+    if (window.toast) toast.error('Error', error.message);
+    return;
+  }
+
+  if (window.toast) {
+    toast.success('Codigo generado (demo)', 'Tu codigo es: ' + codigo + ' — expira en 15 min');
+  }
+
+  const box = document.getElementById('codigoVerificacionBox');
+  if (box) box.style.display = 'block';
+
+  alert('📧 Codigo de verificacion para el prototipo:\n\n' + codigo + '\n\n(En produccion se enviaria por email)');
+}
+
+async function verificarCodigoEmail() {
+  const codigoIngresado = document.getElementById('perfilCodigo').value.trim();
+  const userId = localStorage.getItem('user_id');
+
+  if (!codigoIngresado || codigoIngresado.length !== 6) {
+    if (window.toast) toast.error('Codigo invalido', 'Debe tener 6 digitos');
+    return;
+  }
+
+  const { data: profile, error } = await supabaseClient
+    .from('profiles')
+    .select('email_pendiente, codigo_verificacion, codigo_expira_at')
+    .eq('id', userId)
+    .single();
+
+  if (error || !profile) {
+    if (window.toast) toast.error('Error', 'No se pudo verificar');
+    return;
+  }
+
+  if (!profile.email_pendiente || !profile.codigo_verificacion) {
+    if (window.toast) toast.error('Sin solicitud', 'Primero pide un codigo');
+    return;
+  }
+
+  if (new Date(profile.codigo_expira_at) < new Date()) {
+    if (window.toast) toast.error('Codigo expirado', 'Solicita uno nuevo');
+    return;
+  }
+
+  if (profile.codigo_verificacion !== codigoIngresado) {
+    if (window.toast) toast.error('Codigo incorrecto', 'Verifica e intenta de nuevo');
+    return;
+  }
+
+  const nuevoEmail = profile.email_pendiente;
+  localStorage.setItem('user_email', nuevoEmail);
+
+  await supabaseClient.from('profiles').update({
+    email_verificado: true,
+    email_pendiente: null,
+    codigo_verificacion: null,
+    codigo_expira_at: null,
+  }).eq('id', userId);
+
+  await cargarMenuPerfil();
+
+  if (window.toast) toast.success('Correo actualizado', 'Ahora usas ' + nuevoEmail);
+
+  setTimeout(() => renderPerfil(), 1000);
+}
+
+function mostrarCambioPassword() {
+  const box = document.getElementById('cambioPasswordBox');
+  if (box) {
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+async function cambiarPassword() {
+  const pwd1 = document.getElementById('perfilNuevaPassword').value;
+  const pwd2 = document.getElementById('perfilNuevaPassword2').value;
+
+  if (!pwd1 || pwd1.length < 8) {
+    if (window.toast) toast.error('Contrasena corta', 'Minimo 8 caracteres');
+    return;
+  }
+
+  if (pwd1 !== pwd2) {
+    if (window.toast) toast.error('No coinciden', 'Las contrasenas no son iguales');
+    return;
+  }
+
+  if (window.toast) toast.info('Actualizando...', 'Cambiando tu contrasena');
+
+  const { error } = await supabaseClient.auth.updateUser({
+    password: pwd1,
+  });
+
+  if (error) {
+    if (window.toast) toast.error('Error', error.message);
+    return;
+  }
+
+  if (window.toast) toast.success('Contrasena actualizada', 'Usa la nueva en tu proximo inicio');
+
+  document.getElementById('perfilNuevaPassword').value = '';
+  document.getElementById('perfilNuevaPassword2').value = '';
+  document.getElementById('cambioPasswordBox').style.display = 'none';
+}
+
 // ============ NEXUSPAGOS ============
 
 async function renderFlowPay() {
@@ -409,7 +831,6 @@ async function renderFlowPay() {
           <label class="app-form-label">Concepto (opcional)</label>
           <input class="app-form-input" type="text" id="payConcepto" placeholder="Sin concepto">
         </div>
-        <div id="payMessage"></div>
         <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="enviarDinero()">Enviar dinero</button>
       </div>
     </div>
@@ -422,7 +843,6 @@ async function renderFlowPay() {
           <label class="app-form-label">Monto a recargar (COP)</label>
           <input class="app-form-input" type="number" id="recargarMonto" min="10000" value="100000">
         </div>
-        <div id="recargarMessage"></div>
         <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="recargarSaldo()">Recargar</button>
       </div>
     </div>
@@ -435,7 +855,6 @@ async function renderFlowPay() {
           <label class="app-form-label">Monto a retirar (COP)</label>
           <input class="app-form-input" type="number" id="retiroMonto" min="10000" value="50000">
         </div>
-        <div id="retiroMessage"></div>
         <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="generarCodigoRetiro()">Generar codigo de retiro</button>
       </div>
       <div class="app-section">
@@ -470,7 +889,6 @@ async function renderFlowPay() {
           <label class="app-form-label">Monto (COP)</label>
           <input class="app-form-input" type="number" id="servicioMonto" min="1000" value="45000">
         </div>
-        <div id="servicioMessage"></div>
         <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="pagarServicio()">Pagar servicio</button>
       </div>
     </div>
@@ -531,14 +949,13 @@ async function enviarDinero() {
   const receptor = document.getElementById('payReceptor').value;
   const monto = parseFloat(document.getElementById('payMonto').value);
   const concepto = document.getElementById('payConcepto').value || 'Sin concepto';
-  const msg = document.getElementById('payMessage');
 
   if (!receptor || !monto || monto <= 0) {
-    msg.innerHTML = mostrarAlerta('Completa todos los campos', 'error');
+    if (window.toast) toast.error('Campos incompletos', 'Completa todos los campos');
     return;
   }
 
-  msg.innerHTML = '<div class="alert alert-info">Procesando...</div>';
+  if (window.toast) toast.info('Procesando...', 'Enviando transferencia');
 
   const { data, error } = await supabaseClient.rpc('transferir_dinero', {
     p_receptor_email: receptor.toLowerCase(),
@@ -547,7 +964,7 @@ async function enviarDinero() {
   });
 
   if (error) {
-    msg.innerHTML = mostrarAlerta('Error: ' + error.message, 'error');
+    if (window.toast) toast.error('Error', error.message);
     return;
   }
 
@@ -557,67 +974,64 @@ async function enviarDinero() {
       await crearNotificacion(receptorInfo.user_id, '💸 Dinero recibido', 'Recibiste ' + formatearDinero(monto) + ' de ' + localStorage.getItem('user_email'), 'success');
     }
     await crearNotificacion(localStorage.getItem('user_id'), '✅ Transferencia enviada', 'Enviaste ' + formatearDinero(monto) + ' a ' + receptor, 'success');
-    msg.innerHTML = mostrarAlerta('✅ Transferencia exitosa', 'success');
+    if (window.toast) toast.success('Transferencia exitosa', 'Enviaste ' + formatearDinero(monto) + ' a ' + receptor);
     await actualizarSaldoSidebar();
     setTimeout(() => navegarA('flowpay'), 1500);
   } else {
-    msg.innerHTML = mostrarAlerta('❌ ' + (data ? data.message : 'Error'), 'error');
+    if (window.toast) toast.error('Error', (data ? data.message : 'No se pudo transferir'));
   }
 }
 
 async function recargarSaldo() {
   const monto = parseFloat(document.getElementById('recargarMonto').value);
-  const msg = document.getElementById('recargarMessage');
   if (!monto || monto <= 0) {
-    msg.innerHTML = mostrarAlerta('Monto invalido', 'error');
+    if (window.toast) toast.error('Monto invalido', 'Ingresa un monto mayor a 0');
     return;
   }
   const { data } = await supabaseClient.rpc('recargar_saldo', { p_monto: monto });
   if (data && data.success) {
     await crearNotificacion(localStorage.getItem('user_id'), '💰 Recarga exitosa', 'Recargaste ' + formatearDinero(monto), 'success');
-    msg.innerHTML = mostrarAlerta('✅ Recarga exitosa', 'success');
+    if (window.toast) toast.success('Recarga exitosa', 'Recargaste ' + formatearDinero(monto));
     await actualizarSaldoSidebar();
     setTimeout(() => navegarA('flowpay'), 1500);
   } else {
-    msg.innerHTML = mostrarAlerta('❌ ' + (data ? data.message : 'Error'), 'error');
+    if (window.toast) toast.error('Error', (data ? data.message : 'No se pudo recargar'));
   }
 }
 
 async function pagarServicio() {
   const servicio = document.getElementById('servicioNombre').value;
   const monto = parseFloat(document.getElementById('servicioMonto').value);
-  const msg = document.getElementById('servicioMessage');
   if (!monto || monto <= 0) {
-    msg.innerHTML = mostrarAlerta('Monto invalido', 'error');
+    if (window.toast) toast.error('Monto invalido', 'Ingresa un monto mayor a 0');
     return;
   }
   const { data } = await supabaseClient.rpc('pagar_servicio', { p_servicio: servicio, p_monto: monto });
   if (data && data.success) {
     await crearNotificacion(localStorage.getItem('user_id'), '💡 Pago exitoso', 'Pagaste ' + servicio + ' por ' + formatearDinero(monto), 'success');
-    msg.innerHTML = mostrarAlerta('✅ Pago exitoso', 'success');
+    if (window.toast) toast.success('Pago exitoso', 'Pagaste ' + servicio + ' por ' + formatearDinero(monto));
     await actualizarSaldoSidebar();
     setTimeout(() => navegarA('flowpay'), 1500);
   } else {
-    msg.innerHTML = mostrarAlerta('❌ ' + (data ? data.message : 'Error'), 'error');
+    if (window.toast) toast.error('Error', (data ? data.message : 'No se pudo pagar'));
   }
 }
 
 async function generarCodigoRetiro() {
   const monto = parseFloat(document.getElementById('retiroMonto').value);
-  const msg = document.getElementById('retiroMessage');
   if (!monto || monto < 10000) {
-    msg.innerHTML = mostrarAlerta('Monto minimo: $10.000 COP', 'error');
+    if (window.toast) toast.error('Monto minimo', 'Minimo $10.000 COP');
     return;
   }
-  msg.innerHTML = '<div class="alert alert-info">Generando codigo...</div>';
+  if (window.toast) toast.info('Generando...', 'Creando tu codigo de retiro');
   const { data } = await supabaseClient.rpc('generar_codigo_retiro', { p_monto: monto });
   if (data && data.success) {
     await crearNotificacion(localStorage.getItem('user_id'), '🎫 Codigo generado', 'Codigo: ' + data.codigo + ' por ' + formatearDinero(monto), 'info');
-    msg.innerHTML = mostrarAlerta('✅ Codigo: <strong style="font-family:monospace;">' + data.codigo + '</strong>', 'success');
+    if (window.toast) toast.success('Codigo generado', data.codigo + ' — guardalo para retirar');
     await actualizarSaldoSidebar();
     setTimeout(() => navegarA('flowpay'), 3000);
   } else {
-    msg.innerHTML = mostrarAlerta('❌ ' + (data ? data.message : 'Error'), 'error');
+    if (window.toast) toast.error('Error', (data ? data.message : 'No se pudo generar'));
   }
 }
 
@@ -627,15 +1041,21 @@ async function validarCodigo(codigoId, codigo) {
   const { error } = await supabaseClient.from('codigos_retiro').update({
     estado: 'usado', usado_at: new Date().toISOString(), usado_por: userId,
   }).eq('id', codigoId);
-  if (error) { alert('Error: ' + error.message); return; }
+  if (error) {
+    if (window.toast) toast.error('Error', error.message);
+    return;
+  }
   await crearNotificacion(userId, '✅ Codigo validado', 'Validaste el codigo ' + codigo, 'success');
-  alert('✅ Codigo validado');
+  if (window.toast) toast.success('Codigo validado', 'Codigo ' + codigo + ' marcado como usado');
   navegarA('flowpay');
 }
 
 async function generarReciboPDF(transferenciaId) {
   const { data: t } = await supabaseClient.from('transferencias').select('*').eq('id', transferenciaId).single();
-  if (!t) { alert('Transferencia no encontrada'); return; }
+  if (!t) {
+    if (window.toast) toast.error('No encontrada', 'Transferencia no encontrada');
+    return;
+  }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   doc.setFontSize(22);
@@ -658,6 +1078,7 @@ async function generarReciboPDF(transferenciaId) {
   doc.text('Monto: ' + formatearDinero(t.monto) + ' COP', 20, 100);
   doc.text('Concepto: ' + (t.concepto || 'Sin concepto'), 20, 110);
   doc.save('recibo_nexuspay_' + t.id + '.pdf');
+  if (window.toast) toast.success('PDF descargado', 'Comprobante #' + t.id);
 }
 
 // ============ NEXUSCARD ============
@@ -726,7 +1147,6 @@ async function renderFlowCard() {
             <label class="app-form-label">Monto a retirar (COP)</label>
             <input class="app-form-input" type="number" id="montoSacarCupo" min="10000" value="100000">
           </div>
-          <div id="sacarCupoMessage"></div>
           <button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="sacarCupo()">💸 Sacar cupo</button>
         </div>
       </div>
@@ -739,7 +1159,6 @@ async function renderFlowCard() {
             <label class="app-form-label">Monto a pagar (COP)</label>
             <input class="app-form-input" type="number" id="montoPagarTarjeta" min="1000" value="${deuda > 0 ? Math.min(deuda, 100000) : 0}">
           </div>
-          <div id="pagarTarjetaMessage"></div>
           <button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="pagarTarjeta()">💳 Pagar tarjeta</button>
         </div>
       </div>
@@ -753,45 +1172,50 @@ async function renderFlowCard() {
 async function toggleTarjeta(id, estadoActual) {
   const nuevoEstado = estadoActual === 'activa' ? 'congelada' : 'activa';
   await supabaseClient.from('tarjetas').update({ estado: nuevoEstado }).eq('id', id);
+  if (window.toast) {
+    if (nuevoEstado === 'congelada') {
+      toast.warning('Tarjeta congelada', 'No se podra usar hasta descongelarla');
+    } else {
+      toast.success('Tarjeta activada', 'Ya puedes usarla');
+    }
+  }
   navegarA('flowcard');
 }
 
 async function sacarCupo() {
   const monto = parseFloat(document.getElementById('montoSacarCupo').value);
-  const msg = document.getElementById('sacarCupoMessage');
   if (!monto || monto < 10000) {
-    msg.innerHTML = mostrarAlerta('Monto minimo: $10.000', 'error');
+    if (window.toast) toast.error('Monto minimo', 'Minimo $10.000');
     return;
   }
-  msg.innerHTML = '<div class="alert alert-info">Procesando...</div>';
+  if (window.toast) toast.info('Procesando...', 'Sacando cupo');
   const { data } = await supabaseClient.rpc('usar_cupo_tarjeta', { p_monto: monto });
   if (data && data.success) {
     await crearNotificacion(localStorage.getItem('user_id'), '💸 Avance de cupo', 'Retiraste ' + formatearDinero(monto), 'success');
-    msg.innerHTML = mostrarAlerta('✅ Cupo retirado', 'success');
+    if (window.toast) toast.success('Cupo retirado', 'Retiraste ' + formatearDinero(monto) + ' a tu cuenta');
     await actualizarSaldoSidebar();
     setTimeout(() => navegarA('flowcard'), 1500);
   } else {
-    msg.innerHTML = mostrarAlerta('❌ ' + (data ? data.message : 'Error'), 'error');
+    if (window.toast) toast.error('Error', (data ? data.message : 'No se pudo sacar'));
   }
 }
 
 async function pagarTarjeta() {
   const monto = parseFloat(document.getElementById('montoPagarTarjeta').value);
-  const msg = document.getElementById('pagarTarjetaMessage');
   if (!monto || monto <= 0) {
-    msg.innerHTML = mostrarAlerta('Monto invalido', 'error');
+    if (window.toast) toast.error('Monto invalido', 'Ingresa un monto mayor a 0');
     return;
   }
-  msg.innerHTML = '<div class="alert alert-info">Procesando...</div>';
+  if (window.toast) toast.info('Procesando...', 'Pagando tarjeta');
   const { data } = await supabaseClient.rpc('pagar_tarjeta', { p_monto: monto });
   if (data && data.success) {
     const pagoReal = data.pago_real || monto;
     await crearNotificacion(localStorage.getItem('user_id'), '💳 Pago de tarjeta', 'Pagaste ' + formatearDinero(pagoReal), 'success');
-    msg.innerHTML = mostrarAlerta('✅ Pago realizado: ' + formatearDinero(pagoReal), 'success');
+    if (window.toast) toast.success('Pago realizado', 'Pagaste ' + formatearDinero(pagoReal) + ' a tu tarjeta');
     await actualizarSaldoSidebar();
     setTimeout(() => navegarA('flowcard'), 1500);
   } else {
-    msg.innerHTML = mostrarAlerta('❌ ' + (data ? data.message : 'Error'), 'error');
+    if (window.toast) toast.error('Error', (data ? data.message : 'No se pudo pagar'));
   }
 }
 
@@ -799,8 +1223,8 @@ async function pagarTarjeta() {
 // ============================================================
 // NexusPay - App Principal (SPA) - Parte 2 de 2
 // NexusSave, NexusInvest, NexusShield, NexusBusiness,
-// NexusAnalytics, NexusCredit, Contrato PDF, Verificacion,
-// Notificaciones y Chat de soporte
+// NexusAnalytics, NexusCredit, Verificacion, Notificaciones,
+// Chat con Luci (Gemini) y Recomendacion de Inversion
 // ============================================================
 
 // ============ NEXUSSAVE ============
@@ -830,7 +1254,6 @@ async function renderFlowSave() {
     '<div class="app-form-group"><label class="app-form-label">Monto objetivo (COP)</label><input class="app-form-input" type="number" id="metaObjetivo" value="500000"></div>' +
     '<div class="app-form-group"><label class="app-form-label">Fecha limite</label><input class="app-form-input" type="date" id="metaFecha"></div>' +
     '<div class="app-form-group"><label class="app-form-label">Icono</label><select class="app-form-select" id="metaIcono"><option value="🎯">🎯 Meta</option><option value="✈️">✈️ Viaje</option><option value="🏠">🏠 Casa</option><option value="🚗">🚗 Auto</option><option value="💻">💻 Tecnologia</option><option value="🎓">🎓 Educacion</option></select></div>' +
-    '<div id="metaMessage"></div>' +
     '<button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="crearMeta()">Crear meta</button>' +
     '</div></div>';
 
@@ -844,18 +1267,26 @@ async function crearMeta() {
   const objetivo = parseFloat(document.getElementById('metaObjetivo').value);
   const fecha = document.getElementById('metaFecha').value || null;
   const icono = document.getElementById('metaIcono').value;
-  if (!nombre || !objetivo) { alert('Completa los campos'); return; }
+  if (!nombre || !objetivo) {
+    if (window.toast) toast.error('Campos incompletos', 'Nombre y monto son obligatorios');
+    return;
+  }
   await supabaseClient.from('metas_ahorro').insert({ user_id: userId, nombre, monto_objetivo: objetivo, fecha_limite: fecha, icono });
+  if (window.toast) toast.success('Meta creada', nombre + ' por ' + formatearDinero(objetivo));
   navegarA('flowsave');
 }
 
 async function aportarMeta(metaId) {
   const input = document.getElementById('aporte-' + metaId);
   const monto = parseFloat(input.value);
-  if (!monto || monto <= 0) return;
+  if (!monto || monto <= 0) {
+    if (window.toast) toast.error('Monto invalido', 'Ingresa un monto mayor a 0');
+    return;
+  }
   const { data } = await supabaseClient.from('metas_ahorro').select('monto_actual').eq('id', metaId).single();
   const actual = data ? Number(data.monto_actual) : 0;
   await supabaseClient.from('metas_ahorro').update({ monto_actual: actual + monto }).eq('id', metaId);
+  if (window.toast) toast.success('Aporte registrado', formatearDinero(monto) + ' guardados');
   navegarA('flowsave');
 }
 
@@ -864,6 +1295,7 @@ async function aportarMeta(metaId) {
 async function renderFlowInvest() {
   const userId = localStorage.getItem('user_id');
   const { data: inversiones } = await supabaseClient.from('inversiones').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+  const saldo = await obtenerSaldo();
 
   const productos = [
     { nombre: 'CDT Digital', rendimiento: 10.5, desc: 'Bajo riesgo' },
@@ -879,7 +1311,25 @@ async function renderFlowInvest() {
     '<div class="metric-card"><div class="metric-label">Total invertido</div><div class="metric-value">' + formatearDinero(totalInv) + '</div></div>' +
     '<div class="metric-card"><div class="metric-label">Valor actual</div><div class="metric-value">' + formatearDinero(totalAct) + '</div></div>' +
     '<div class="metric-card"><div class="metric-label">Rendimiento</div><div class="metric-value text-green">' + formatearDinero(totalAct - totalInv) + '</div></div>' +
+    '<div class="metric-card"><div class="metric-label">Saldo libre</div><div class="metric-value">' + formatearDinero(saldo) + '</div></div>' +
     '</div>';
+
+  // Bloque de Luci
+  html += `
+    <div class="app-section" style="background: linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%); border: 2px solid #2563EB;">
+      <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 16px;">
+        <div style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #2563EB, #10B981); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">💡</div>
+        <div style="flex: 1;">
+          <div style="font-size: 18px; font-weight: 800; color: var(--dark); margin-bottom: 4px;">Luci puede recomendarte una inversion</div>
+          <div style="font-size: 14px; color: var(--text-light);">Analiza tu saldo, tu score crediticio y tu perfil para sugerirte la mejor opcion.</div>
+        </div>
+      </div>
+      <button class="btn-primary" style="width: 100%; justify-content: center;" onclick="recomendarInversion()">
+        ✨ Analizar con Luci
+      </button>
+      <div id="recomendacionLuci" style="margin-top: 16px;"></div>
+    </div>
+  `;
 
   html += '<div class="app-tabs"><button class="app-tab active" data-tab="mis-inv">Mis inversiones</button><button class="app-tab" data-tab="nueva-inv">Invertir</button></div><div class="app-tab-content active" id="tab-mis-inv">';
 
@@ -891,7 +1341,7 @@ async function renderFlowInvest() {
     html += '<div class="app-section"><p style="color:#64748B;">Aun no tienes inversiones.</p></div>';
   }
 
-  html += '</div><div class="app-tab-content" id="tab-nueva-inv"><div class="app-section"><div class="app-section-title">Productos</div>';
+  html += '</div><div class="app-tab-content" id="tab-nueva-inv"><div class="app-section"><div class="app-section-title">Productos disponibles</div>';
 
   productos.forEach(p => {
     html += '<div class="product-item"><div class="product-item-info"><h4>' + p.nombre + '</h4><p>' + p.desc + '</p></div><div class="product-item-price">' + p.rendimiento + '%</div></div>';
@@ -906,7 +1356,6 @@ async function renderFlowInvest() {
 
   html += '</select></div>' +
     '<div class="app-form-group"><label class="app-form-label">Monto (COP)</label><input class="app-form-input" type="number" id="invMonto" value="100000"></div>' +
-    '<div id="invMessage"></div>' +
     '<button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="crearInversion()">Invertir</button></div></div>';
 
   document.getElementById('pageContent').innerHTML = html;
@@ -919,14 +1368,231 @@ async function crearInversion() {
   const producto = sel.value;
   const rend = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-rend'));
   const monto = parseFloat(document.getElementById('invMonto').value);
-  const msg = document.getElementById('invMessage');
-  if (!monto || monto < 100000) { msg.innerHTML = mostrarAlerta('Minimo $100.000', 'error'); return; }
+  if (!monto || monto < 100000) {
+    if (window.toast) toast.error('Monto minimo', 'Minimo $100.000');
+    return;
+  }
   const saldo = await obtenerSaldo();
-  if (saldo < monto) { msg.innerHTML = mostrarAlerta('Saldo insuficiente', 'error'); return; }
+  if (saldo < monto) {
+    if (window.toast) toast.error('Saldo insuficiente', 'No tienes suficiente dinero');
+    return;
+  }
   await supabaseClient.from('inversiones').insert({ user_id: userId, producto, monto_invertido: monto, rendimiento_anual: rend, valor_actual: monto });
   await supabaseClient.rpc('retirar_saldo', { p_monto: monto });
   await actualizarSaldoSidebar();
+  if (window.toast) toast.success('Inversion creada', producto + ' por ' + formatearDinero(monto));
   navegarA('flowinvest');
+}
+
+// ============ LUCI: RECOMENDACION DE INVERSION (GEMINI) ============
+
+async function recomendarInversion() {
+  if (window.toast) toast.info('Analizando...', 'Luci esta revisando tu perfil');
+
+  const contenedor = document.getElementById('recomendacionLuci');
+  if (!contenedor) return;
+
+  contenedor.innerHTML = '<div class="loading-spinner"></div>';
+
+  try {
+    const userId = localStorage.getItem('user_id');
+    const saldo = await obtenerSaldo();
+
+    const { data: solicitudes } = await supabaseClient
+      .from('solicitudes').select('score, decision, ingresos_mensuales, tipo_negocio')
+      .eq('user_id', userId).eq('decision', 'APROBADO')
+      .order('created_at', { ascending: false }).limit(1);
+
+    const { data: inversiones } = await supabaseClient
+      .from('inversiones').select('*').eq('user_id', userId);
+
+    const { data: movimientos } = await supabaseClient
+      .from('movimientos').select('tipo, monto')
+      .eq('user_id', userId).eq('tipo', 'ingreso')
+      .order('created_at', { ascending: false }).limit(30);
+
+    let ingresosReales = 0;
+    if (movimientos && movimientos.length > 0) {
+      const totalMovs = movimientos.reduce((s, m) => s + Number(m.monto), 0);
+      ingresosReales = Math.round(totalMovs / Math.max(movimientos.length, 1));
+    }
+
+    const score = (solicitudes && solicitudes.length > 0) ? solicitudes[0].score : 500;
+    const perfilNegocio = (solicitudes && solicitudes.length > 0) ? solicitudes[0].tipo_negocio : 'Freelancer';
+    const ingresosDeclarados = (solicitudes && solicitudes.length > 0) ? solicitudes[0].ingresos_mensuales : ingresosReales;
+
+    const totalInvertido = (inversiones || []).reduce((s, i) => s + Number(i.monto_invertido), 0);
+    const numInversiones = inversiones ? inversiones.length : 0;
+
+    const prompt = `Eres Luci, la asistente financiera de NexusPay. Recomienda UNA inversion personalizada a un emprendedor digital colombiano.
+
+DATOS DEL USUARIO:
+- Nombre: ${datosPersonales?.nombres || 'Emprendedor'}
+- Saldo disponible: ${formatearDinero(saldo)} COP
+- Score crediticio: ${score}/1000
+- Tipo de negocio: ${perfilNegocio}
+- Ingresos mensuales declarados: ${formatearDinero(ingresosDeclarados)} COP
+- Ingresos reales promedio: ${formatearDinero(ingresosReales)} COP
+- Inversiones actuales: ${numInversiones} por ${formatearDinero(totalInvertido)} COP
+
+PRODUCTOS DISPONIBLES:
+1. CDT Digital - 10.5% anual - Bajo riesgo - Plazo 90 dias
+2. Fondo Conservador - 12.0% anual - Riesgo medio - Liquidez inmediata
+3. Fondo Crecimiento - 15.5% anual - Riesgo alto - Plazo 1 año
+4. Portafolio Emprendedor - 18.0% anual - Riesgo muy alto - Diversificado
+
+REGLAS:
+- Saldo menor a $200.000: recomendar NO invertir, sugerir ahorrar
+- Score mayor a 750 y saldo mayor a $1.000.000: opciones agresivas
+- Score menor a 600: opciones conservadoras
+- Nunca mas del 40% del saldo
+
+Responde SOLO con este formato JSON valido, sin markdown, sin texto extra:
+
+{
+  "perfil_riesgo": "conservador",
+  "producto_recomendado": "CDT Digital",
+  "monto_sugerido": 500000,
+  "porcentaje_saldo": 25,
+  "plazo_recomendado": "90 dias",
+  "rendimiento_estimado_anual": 10.5,
+  "ganancia_estimada_anual": 52500,
+  "razon": "explicacion corta",
+  "alternativa": "producto alternativo",
+  "advertencia": "advertencia breve"
+}`;
+
+    const response = await fetch(CONFIG.URL_GEMINI + CONFIG.MODELO_GEMINI + ':generateContent?key=' + CONFIG.GEMINI_API_KEY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 600,
+          responseMimeType: "application/json"
+        }
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!result.candidates || !result.candidates[0]) {
+      const errMsg = result.error?.message || 'Error al consultar IA';
+      throw new Error(errMsg);
+    }
+
+    let rec;
+    const texto = result.candidates[0].content.parts[0].text;
+    try {
+      rec = JSON.parse(texto);
+    } catch (e) {
+      const match = texto.match(/\{[\s\S]*\}/);
+      rec = match ? JSON.parse(match[0]) : null;
+    }
+
+    if (!rec) throw new Error('Respuesta IA invalida');
+
+    contenedor.innerHTML = `
+      <div style="background: linear-gradient(135deg, #2563EB, #10B981); color: #FFFFFF; padding: 24px; border-radius: 16px; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+          <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 22px;">💡</div>
+          <div>
+            <div style="font-weight: 800; font-size: 16px;">Recomendacion de Luci</div>
+            <div style="font-size: 13px; opacity: 0.85;">Basada en tu saldo y perfil</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+          <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 10px;">
+            <div style="font-size: 11px; opacity: 0.85; margin-bottom: 4px;">PERFIL</div>
+            <div style="font-weight: 800; font-size: 15px; text-transform: capitalize;">${rec.perfil_riesgo || 'moderado'}</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 10px;">
+            <div style="font-size: 11px; opacity: 0.85; margin-bottom: 4px;">PRODUCTO</div>
+            <div style="font-weight: 800; font-size: 15px;">${rec.producto_recomendado || 'N/A'}</div>
+          </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.15); padding: 16px; border-radius: 12px; margin-bottom: 12px;">
+          <div style="font-size: 11px; opacity: 0.85; margin-bottom: 6px;">MONTO SUGERIDO</div>
+          <div style="font-size: 28px; font-weight: 900; letter-spacing: -0.5px;">${formatearDinero(rec.monto_sugerido || 0)}</div>
+          <div style="font-size: 12px; opacity: 0.85; margin-top: 4px;">${rec.porcentaje_saldo || 0}% de tu saldo disponible</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+          <div style="background: rgba(255,255,255,0.15); padding: 10px; border-radius: 10px; text-align: center;">
+            <div style="font-size: 10px; opacity: 0.85; margin-bottom: 2px;">PLAZO</div>
+            <div style="font-weight: 700; font-size: 13px;">${rec.plazo_recomendado || 'N/A'}</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.15); padding: 10px; border-radius: 10px; text-align: center;">
+            <div style="font-size: 10px; opacity: 0.85; margin-bottom: 2px;">RENDIMIENTO</div>
+            <div style="font-weight: 700; font-size: 13px;">${rec.rendimiento_estimado_anual || 0}%</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.15); padding: 10px; border-radius: 10px; text-align: center;">
+            <div style="font-size: 10px; opacity: 0.85; margin-bottom: 2px;">GANANCIA/AÑO</div>
+            <div style="font-weight: 700; font-size: 13px;">${formatearDinero(rec.ganancia_estimada_anual || 0)}</div>
+          </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.15); padding: 14px; border-radius: 12px;">
+          <div style="font-weight: 700; margin-bottom: 6px; font-size: 13px;">💬 ¿Por qué?</div>
+          <div style="font-size: 13px; line-height: 1.6;">${rec.razon || ''}</div>
+        </div>
+      </div>
+
+      ${rec.alternativa ? `
+        <div style="background: var(--bg-soft); padding: 14px; border-radius: 12px; margin-bottom: 12px; border: 1px solid var(--border);">
+          <div style="font-size: 12px; color: var(--text-light); margin-bottom: 4px;">Alternativa</div>
+          <div style="font-weight: 700; color: var(--text);">${rec.alternativa}</div>
+        </div>
+      ` : ''}
+
+      ${rec.advertencia ? `
+        <div class="alert alert-warning" style="margin-bottom: 16px;">
+          <strong>⚠️ Advertencia:</strong> ${rec.advertencia}
+        </div>
+      ` : ''}
+
+      <button class="btn-primary btn-large" style="width:100%; justify-content:center;" onclick="aplicarRecomendacion(${rec.monto_sugerido || 0}, '${(rec.producto_recomendado || '').replace(/'/g, "\\'")}')">
+        Invertir ${formatearDinero(rec.monto_sugerido || 0)} en ${rec.producto_recomendado || 'este producto'}
+      </button>
+    `;
+
+    if (window.toast) toast.success('Recomendacion lista', 'Revisa la sugerencia de Luci');
+
+  } catch (e) {
+    console.error('Error recomendacion:', e);
+    contenedor.innerHTML = `
+      <div class="alert alert-error">
+        <strong>Error:</strong> ${e.message}
+      </div>
+      <button class="btn-primary" onclick="recomendarInversion()">Intentar de nuevo</button>
+    `;
+    if (window.toast) toast.error('Error', e.message);
+  }
+}
+
+function aplicarRecomendacion(monto, producto) {
+  const montoInput = document.getElementById('invMonto');
+  const selectProducto = document.getElementById('invProducto');
+
+  if (montoInput) montoInput.value = monto;
+
+  if (selectProducto && producto) {
+    const opciones = selectProducto.options;
+    for (let i = 0; i < opciones.length; i++) {
+      if (opciones[i].value.toLowerCase().includes(producto.toLowerCase().split(' ')[0])) {
+        selectProducto.selectedIndex = i;
+        break;
+      }
+    }
+  }
+
+  if (window.toast) toast.success('Aplicado', 'Revisa el formulario y confirma la inversion');
+
+  const formInv = document.querySelector('#tab-nueva-inv');
+  if (formInv) formInv.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ============ NEXUSSHIELD ============
@@ -979,6 +1645,7 @@ async function contratarSeguro() {
   const cobertura = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-cob'));
   const prima = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-prima'));
   await supabaseClient.from('seguros').insert({ user_id: userId, tipo, cobertura, prima_mensual: prima });
+  if (window.toast) toast.success('Poliza contratada', 'Seguro de ' + tipo + ' activo');
   navegarA('flowshield');
 }
 
@@ -1002,7 +1669,6 @@ async function renderFlowBusiness() {
     '<div class="app-form-group"><label class="app-form-label">Nombre del negocio</label><input class="app-form-input" type="text" id="empNombre"></div>' +
     '<div class="app-form-group"><label class="app-form-label">NIT (opcional)</label><input class="app-form-input" type="text" id="empNit"></div>' +
     '<div class="app-form-group"><label class="app-form-label">Categoria</label><select class="app-form-select" id="empCategoria"><option>E-commerce</option><option>Servicios</option><option>Tecnologia</option><option>Alimentos</option><option>Moda</option><option>Educacion</option><option>Otro</option></select></div>' +
-    '<div id="empMessage"></div>' +
     '<button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="crearEmpresa()">Crear cuenta</button></div></div>';
 
   document.getElementById('pageContent').innerHTML = html;
@@ -1014,9 +1680,12 @@ async function crearEmpresa() {
   const nombre = document.getElementById('empNombre').value;
   const nit = document.getElementById('empNit').value;
   const categoria = document.getElementById('empCategoria').value;
-  const msg = document.getElementById('empMessage');
-  if (!nombre) { msg.innerHTML = mostrarAlerta('Escribe el nombre', 'error'); return; }
+  if (!nombre) {
+    if (window.toast) toast.error('Falta nombre', 'Escribe el nombre del negocio');
+    return;
+  }
   await supabaseClient.from('cuentas_empresariales').insert({ user_id: userId, nombre_negocio: nombre, nit, categoria, saldo: 0 });
+  if (window.toast) toast.success('Cuenta empresarial creada', nombre);
   navegarA('flowbusiness');
 }
 
@@ -1071,7 +1740,6 @@ async function renderCreditos() {
     '<div class="app-form-group"><label class="app-form-label">Monto (COP)</label><input class="app-form-input" type="number" id="credMonto" value="1000000"></div>' +
     '<div class="app-form-group"><label class="app-form-label">Plazo</label><select class="app-form-select" id="credPlazo"><option value="30">30 dias</option><option value="60">60 dias</option><option value="90" selected>90 dias</option><option value="120">120 dias</option><option value="180">180 dias</option></select></div>' +
     '<div class="app-form-group"><label class="app-form-label">Historial</label><select class="app-form-select" id="credHistorial"><option>Sin historial</option><option>1 credito pagado</option><option>2-3 creditos pagados</option><option>Mas de 3 creditos</option></select></div>' +
-    '<div id="credMessage"></div>' +
     '<button class="btn-primary btn-large" style="width:100%;justify-content:center;" onclick="solicitarCredito()">Analizar con IA</button></div></div>';
 
   html += '<div class="app-tab-content" id="tab-mis-creditos">';
@@ -1113,8 +1781,7 @@ async function renderCreditos() {
 }
 
 async function solicitarCredito() {
-  const msg = document.getElementById('credMessage');
-  msg.innerHTML = '<div class="alert alert-info">Analizando con IA...</div>';
+  if (window.toast) toast.info('Analizando...', 'La IA esta revisando tu solicitud');
 
   const datos = {
     tipo: document.getElementById('credTipo').value,
@@ -1123,20 +1790,52 @@ async function solicitarCredito() {
     monto: parseFloat(document.getElementById('credMonto').value),
     plazo: parseInt(document.getElementById('credPlazo').value),
     historial: document.getElementById('credHistorial').value,
-    fuentes: 'Stripe, Nequi',
   };
 
-  const prompt = 'Eres un analista de riesgo crediticio. Analiza esta solicitud de microcredito para un emprendedor digital colombiano.\n\nDATOS:\n- Tipo de negocio: ' + datos.tipo + '\n- Ingresos mensuales: ' + datos.ingresos + ' COP\n- Meses con el negocio: ' + datos.meses + '\n- Monto solicitado: ' + datos.monto + ' COP\n- Plazo: ' + datos.plazo + ' dias\n- Historial: ' + datos.historial + '\n\nResponde SOLO con este formato:\nSCORE: <numero 0-1000>\nDECISION: <APROBADO | REVISION | RECHAZADO>\nMONTO_APROBADO: <numero>\nTASA_ANUAL: <numero>\nRAZON_1: <texto>\nRAZON_2: <texto>\nRAZON_3: <texto>';
+  const prompt = `Eres un analista de riesgo crediticio. Analiza esta solicitud de microcredito para un emprendedor digital colombiano.
+
+DATOS:
+- Tipo de negocio: ${datos.tipo}
+- Ingresos mensuales: ${datos.ingresos} COP
+- Meses con el negocio: ${datos.meses}
+- Monto solicitado: ${datos.monto} COP
+- Plazo: ${datos.plazo} dias
+- Historial: ${datos.historial}
+
+Responde SOLO con este formato, sin markdown, sin texto extra:
+
+SCORE: <numero 0-1000>
+DECISION: <APROBADO | REVISION | RECHAZADO>
+MONTO_APROBADO: <numero>
+TASA_ANUAL: <numero>
+RAZON_1: <texto corto>
+RAZON_2: <texto corto>
+RAZON_3: <texto corto>
+
+REGLAS:
+- RECHAZADO: MONTO_APROBADO = 0 y TASA = 0
+- REVISION: monto maximo 1x ingresos, tasa 18-22%
+- APROBADO: monto entre 1x y 5x ingresos, tasa 8-16%
+- Score: rechazado menor 500, revision 500-700, aprobado mayor 700`;
 
   try {
-    const response = await fetch(CONFIG.AI_FUNCTION_URL, {
+    const response = await fetch(CONFIG.URL_GEMINI + CONFIG.MODELO_GEMINI + ':generateContent?key=' + CONFIG.GEMINI_API_KEY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo: 'scoring', prompt }),
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 500 }
+      }),
     });
 
     const result = await response.json();
-    const texto = result.texto;
+
+    if (!result.candidates || !result.candidates[0]) {
+      const errMsg = result.error?.message || 'Error al consultar IA';
+      throw new Error(errMsg);
+    }
+
+    const texto = result.candidates[0].content.parts[0].text;
 
     let score = 0, decision = 'REVISION', montoAprobado = 0, tasa = 18;
     texto.split('\n').forEach(line => {
@@ -1155,14 +1854,16 @@ async function solicitarCredito() {
       razones: texto.substring(0, 500),
     });
 
-    const titulo = decision === 'APROBADO' ? '🎉 Credito aprobado' : decision === 'RECHAZADO' ? '❌ Rechazado' : '⏳ En revision';
-    const tipo = decision === 'APROBADO' ? 'success' : decision === 'RECHAZADO' ? 'error' : 'warning';
-    await crearNotificacion(userId, titulo, 'Score: ' + score, tipo);
+    await crearNotificacion(userId, '📋 Solicitud procesada', 'Score: ' + score + ' - ' + decision, decision === 'APROBADO' ? 'success' : 'info');
 
-    msg.innerHTML = mostrarAlerta('✅ ' + decision + ' - Score: ' + score, decision === 'APROBADO' ? 'success' : 'info');
+    if (window.toast) {
+      const tipo = decision === 'APROBADO' ? 'success' : decision === 'RECHAZADO' ? 'error' : 'warning';
+      const titulo = decision === 'APROBADO' ? 'Credito aprobado' : decision === 'RECHAZADO' ? 'Credito rechazado' : 'En revision';
+      toast[tipo](titulo, 'Score: ' + score + (montoAprobado > 0 ? ' · ' + formatearDinero(montoAprobado) : ''));
+    }
     setTimeout(() => navegarA('creditos'), 2000);
   } catch (e) {
-    msg.innerHTML = mostrarAlerta('Error: ' + e.message, 'error');
+    if (window.toast) toast.error('Error IA', e.message);
   }
 }
 
@@ -1173,7 +1874,10 @@ async function generarContratoPDF(creditoId) {
   const { data: credito } = await supabaseClient.from('creditos').select('*').eq('id', creditoId).single();
   const { data: cuotas } = await supabaseClient.from('cuotas').select('*').eq('credito_id', creditoId).order('numero');
   const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
-  if (!credito) { alert('Credito no encontrado'); return; }
+  if (!credito) {
+    if (window.toast) toast.error('No encontrado', 'Credito no encontrado');
+    return;
+  }
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
@@ -1266,6 +1970,7 @@ async function generarContratoPDF(creditoId) {
   doc.text('Contrato bajo modalidad de microcredito digital. Prototipo demostrativo. No representa obligacion financiera real.', 20, y);
 
   doc.save('contrato_nexuspay_' + creditoId + '.pdf');
+  if (window.toast) toast.success('PDF descargado', 'Contrato #' + creditoId);
 }
 
 // ============ VERIFICACION ============
@@ -1282,11 +1987,12 @@ async function renderVerificacion() {
     '</div></div>';
 
   html += '<div class="app-section"><div class="app-section-title">Verificacion con camara</div><p style="color:#64748B;margin-bottom:16px;">Toma una foto de tu rostro.</p>' +
-    '<div style="text-align:center;"><video id="videoCam" autoplay playsinline style="width:100%;max-width:400px;border-radius:16px;background:#000;display:block;margin:0 auto 16px;"></video><canvas id="canvasFoto" style="display:none;"></canvas>' +
+    '<div style="text-align:center;"><video id="videoCam" autoplay playsinline muted style="width:100%;max-width:400px;border-radius:16px;background:#000;display:block;margin:0 auto 16px;"></video><canvas id="canvasFoto" style="display:none;"></canvas>' +
     '<div style="margin-top:16px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">' +
     '<button class="btn-primary" onclick="iniciarCamara()">📸 Activar camara</button>' +
     '<button class="btn-primary" onclick="capturarFoto(\'' + userId + '\')">✅ Tomar foto</button>' +
-    '</div></div><div id="verifMessage"></div></div>';
+    '</div></div>' +
+    '</div>';
 
   html += '<div class="app-section"><div class="app-section-title">Codigo de recuperacion</div>';
 
@@ -1305,25 +2011,33 @@ async function iniciarCamara() {
     streamCamara = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
     const video = document.getElementById('videoCam');
     video.srcObject = streamCamara;
+    if (window.toast) toast.info('Camara activa', 'Ubicate bien y presiona Tomar foto');
   } catch (e) {
-    document.getElementById('verifMessage').innerHTML = mostrarAlerta('No se pudo acceder: ' + e.message, 'error');
+    if (window.toast) toast.error('Sin acceso a camara', e.message);
   }
 }
 
 async function capturarFoto(userId) {
   const video = document.getElementById('videoCam');
   const canvas = document.getElementById('canvasFoto');
-  const msg = document.getElementById('verifMessage');
-  if (!video.srcObject) { msg.innerHTML = mostrarAlerta('Primero activa la camara', 'error'); return; }
+  if (!video.srcObject) {
+    if (window.toast) toast.error('Camara apagada', 'Primero activa la camara');
+    return;
+  }
 
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
 
+  if (window.toast) toast.info('Procesando...', 'Guardando foto');
+
   canvas.toBlob(async function (blob) {
     const fileName = userId + '_' + Date.now() + '.jpg';
     const { error } = await supabaseClient.storage.from('verificaciones').upload(fileName, blob, { contentType: 'image/jpeg' });
-    if (error) { msg.innerHTML = mostrarAlerta('Error: ' + error.message, 'error'); return; }
+    if (error) {
+      if (window.toast) toast.error('Error al subir', error.message);
+      return;
+    }
     const { data: publicData } = supabaseClient.storage.from('verificaciones').getPublicUrl(fileName);
     await supabaseClient.from('profiles').update({
       foto_verificacion_url: publicData.publicUrl,
@@ -1332,7 +2046,7 @@ async function capturarFoto(userId) {
       verificado: true,
     }).eq('id', userId);
     if (streamCamara) streamCamara.getTracks().forEach(t => t.stop());
-    msg.innerHTML = mostrarAlerta('✅ Verificacion completada', 'success');
+    if (window.toast) toast.success('Verificacion completada', 'Tu identidad fue verificada');
     setTimeout(() => navegarA('verificacion'), 2000);
   }, 'image/jpeg', 0.85);
 }
@@ -1350,6 +2064,7 @@ async function generarCodigo(userId) {
     recovery_code: codigo,
     recovery_generated_at: new Date().toISOString(),
   }).eq('id', userId);
+  if (window.toast) toast.success('Codigo generado', 'Guardalo en un lugar seguro');
   navegarA('verificacion');
 }
 
@@ -1378,10 +2093,11 @@ async function renderNotificaciones() {
 
 async function marcarTodasLeidas(userId) {
   await supabaseClient.from('notificaciones').update({ leida: true }).eq('user_id', userId).eq('leida', false);
+  if (window.toast) toast.success('Notificaciones leidas', 'Todas marcadas como leidas');
   navegarA('notificaciones');
 }
 
-// ============ CHAT DE SOPORTE ============
+// ============ CHAT CON LUCI (GEMINI) ============
 
 function toggleChat() {
   document.getElementById('chatWindow').classList.toggle('open');
@@ -1393,71 +2109,105 @@ async function enviarChat() {
   if (!mensaje) return;
 
   const mensajes = document.getElementById('chatMessages');
-  mensajes.innerHTML += '<div class="chat-message chat-user">' + mensaje + '</div>';
+
+  mensajes.innerHTML += '<div class="chat-message chat-user">' + escapeHtml(mensaje) + '</div>';
   input.value = '';
   mensajes.scrollTop = mensajes.scrollHeight;
 
   const loading = document.createElement('div');
   loading.className = 'chat-message chat-bot chat-loading';
-  loading.textContent = 'Escribiendo...';
+  loading.textContent = 'Luci esta escribiendo...';
   loading.id = 'chatLoading';
   mensajes.appendChild(loading);
   mensajes.scrollTop = mensajes.scrollHeight;
 
   try {
     const saldo = await obtenerSaldo();
-    const nombre = (datosPersonales && datosPersonales.nombres ? datosPersonales.nombres : 'Usuario');
+    const nombre = (datosPersonales && datosPersonales.nombres) ? datosPersonales.nombres : 'Emprendedor';
 
-    const response = await fetch(CONFIG.AI_FUNCTION_URL, {
+    const systemPrompt = `Eres ${CONFIG.ASISTENTE_NOMBRE}, la asistente virtual de NexusPay, un banco digital colombiano para emprendedores.
+
+PERSONALIDAD:
+- Te llamas ${CONFIG.ASISTENTE_NOMBRE}. Eres cálida, cercana y eficiente.
+- Hablas en español y tuteas al usuario
+- Máximo 3 líneas por respuesta
+- Usas emojis con moderación (1-2 máximo)
+- Nunca inventas datos, solo usas la info real
+
+CONTEXTO DEL USUARIO:
+- Nombre: ${nombre}
+- Saldo disponible: ${formatearDinero(saldo)}
+
+PRODUCTOS DE NEXUSPAY:
+- NexusCredit: microcréditos con IA, hasta $5.000.000, tasa desde 8% anual
+- NexusPagos: transferencias, recargas, retiros, pago de servicios
+- NexusCard: tarjeta débito digital con cupo de $3.000.000
+- NexusSave: ahorro programado con metas
+- NexusInvest: portafolios del 10% al 18% anual
+- NexusShield: seguros desde $12.000/mes
+- NexusBusiness: cuenta empresarial con NIT
+- NexusAnalytics: análisis financiero
+
+Responde de forma útil, breve y con la personalidad de Luci.`;
+
+    const historialTexto = chatHistorial.slice(-6).map(m => {
+      const quien = m.rol === 'user' ? 'Usuario' : 'Luci';
+      return quien + ': ' + m.texto;
+    }).join('\n');
+
+    const promptCompleto = systemPrompt + '\n\n' +
+      (historialTexto ? 'CONVERSACION PREVIA:\n' + historialTexto + '\n\n' : '') +
+      'Usuario: ' + mensaje;
+
+    const response = await fetch(CONFIG.URL_GEMINI + CONFIG.MODELO_GEMINI + ':generateContent?key=' + CONFIG.GEMINI_API_KEY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        tipo: 'chat',
-        prompt: [
-          { role: 'system', content: 'Eres el asistente virtual de NexusPay, un banco digital colombiano para emprendedores. Respondes en espanol, amable y conciso (maximo 3 lineas). El usuario se llama ' + nombre + ' y tiene saldo ' + formatearDinero(saldo) + '.' },
-          { role: 'user', content: mensaje }
-        ],
+        contents: [{ parts: [{ text: promptCompleto }] }],
+        generationConfig: { temperature: 0.6, maxOutputTokens: 250 }
       }),
     });
 
     const result = await response.json();
-    const respuesta = result.texto;
+
+    if (!result.candidates || !result.candidates[0]) {
+      const errMsg = result.error?.message || 'Error al consultar IA';
+      throw new Error(errMsg);
+    }
+
+    const respuesta = result.candidates[0].content.parts[0].text;
 
     const loadingEl = document.getElementById('chatLoading');
     if (loadingEl) loadingEl.remove();
 
-    mensajes.innerHTML += '<div class="chat-message chat-bot">' + respuesta + '</div>';
+    chatHistorial.push({ rol: 'user', texto: mensaje });
+    chatHistorial.push({ rol: 'bot', texto: respuesta });
+    if (chatHistorial.length > 10) chatHistorial = chatHistorial.slice(-10);
+
+    mensajes.innerHTML += '<div class="chat-message chat-bot">' + escapeHtml(respuesta) + '</div>';
     mensajes.scrollTop = mensajes.scrollHeight;
+
   } catch (e) {
     const loadingEl = document.getElementById('chatLoading');
     if (loadingEl) loadingEl.remove();
-    mensajes.innerHTML += '<div class="chat-message chat-bot">Lo siento, hubo un error.</div>';
+    console.error('Error chat:', e);
+
+    let msgError = 'Lo siento, hubo un error.';
+    if (e.message.includes('API_KEY') || e.message.includes('401') || e.message.includes('403')) {
+      msgError = 'La API key de Luci no es valida.';
+    } else if (e.message.includes('429')) {
+      msgError = 'Luci esta muy ocupada. Intenta en un momento.';
+    } else if (e.message.includes('503') || e.message.includes('UNAVAILABLE')) {
+      msgError = 'Luci esta saturada. Intenta en un minuto.';
+    } else if (e.message.includes('model')) {
+      msgError = 'Error de configuracion del modelo.';
+    }
+
+    mensajes.innerHTML += '<div class="chat-message chat-bot">' + msgError + '</div>';
+    mensajes.scrollTop = mensajes.scrollHeight;
+
+    if (window.toast) toast.error('Error en chat', msgError);
   }
 }
-
-// ============ MODO OSCURO ============
-
-function aplicarTemaGuardado() {
-  const tema = localStorage.getItem('nexuspay_tema') || 'claro';
-  if (tema === 'oscuro') {
-    document.body.classList.add('dark-mode');
-    actualizarLabelTema();
-  }
-}
-
-function toggleTema() {
-  const activo = document.body.classList.toggle('dark-mode');
-  localStorage.setItem('nexuspay_tema', activo ? 'oscuro' : 'claro');
-  actualizarLabelTema();
-}
-
-function actualizarLabelTema() {
-  const label = document.getElementById('themeToggleLabel');
-  if (!label) return;
-  const esOscuro = document.body.classList.contains('dark-mode');
-  label.textContent = esOscuro ? 'Modo claro' : 'Modo oscuro';
-}
-
-
 
 // ============ FIN DEL ARCHIVO ============
